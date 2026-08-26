@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>PeerLedger — Dispute Console (demo)</title>
+<meta name="description" content="A fictional P2P dispute console used to demonstrate userscript automation of an operational workflow." />
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<div class="app">
+
+  <header class="topbar">
+    <div class="brand">PeerLedger <span>Dispute Console</span></div>
+    <div class="spacer"></div>
+    <div class="agent">agent: a.moreira · shift 09:00–18:00</div>
+  </header>
+
+  <div class="demo-note">
+    Fictional demo environment. No real users, orders or data — built to show how the userscripts in
+    <a href="https://github.com/cvidal22/peerledger-workflow-toolkit">this repository</a> automate the mechanical half of a dispute review.
+  </div>
+
+  <div class="layout">
+
+    <nav class="basket" aria-label="Work basket">
+      <div class="basket-head">
+        <h2>Work basket</h2>
+        <span class="count" id="basket-count"></span>
+      </div>
+      <div class="basket-list" id="basket-list"></div>
+    </nav>
+
+    <main class="workspace" id="workspace">
+      <div class="case-head">
+        <div class="case-title">
+          <h1 id="case-id">—</h1>
+          <span class="pill type" id="case-type"></span>
+          <span class="pill sla" id="case-sla"></span>
+        </div>
+        <div class="case-sub" id="case-sub"></div>
+        <div class="tabs" role="tablist">
+          <button class="tab" role="tab" data-panel="order" aria-selected="true">Order details</button>
+          <button class="tab" role="tab" data-panel="chat" aria-selected="false">Trade chat</button>
+          <button class="tab" role="tab" data-panel="claim" aria-selected="false">Claim &amp; evidence</button>
+          <button class="tab" role="tab" data-panel="resolve" aria-selected="false">Resolution</button>
+        </div>
+      </div>
+
+      <div class="panels" id="panels">
+
+        <section class="panel active" data-panel="order">
+          <div class="card">
+            <h3>Order</h3>
+            <div class="fields" id="order-fields"></div>
+          </div>
+          <div class="card">
+            <h3>Counterparties</h3>
+            <div class="fields" id="party-fields"></div>
+          </div>
+        </section>
+
+        <section class="panel" data-panel="chat">
+          <div class="card">
+            <h3>Trade chat</h3>
+            <div class="chat" id="chat-log"></div>
+          </div>
+        </section>
+
+        <section class="panel" data-panel="claim">
+          <div class="card">
+            <h3>Complainant statement</h3>
+            <div class="narrative" id="claim-narrative"></div>
+          </div>
+          <div class="card">
+            <h3>Evidence submitted</h3>
+            <ul class="evidence-list" id="evidence-list"></ul>
+          </div>
+        </section>
+
+        <section class="panel" data-panel="resolve">
+          <div class="card">
+            <h3>Available actions</h3>
+            <div class="actions">
+              <button class="btn" data-action="request_evidence">Request further evidence</button>
+              <button class="btn" data-action="reject_claim">Reject claim</button>
+              <button class="btn primary" data-action="open_recovery">Open recovery claim</button>
+              <button class="btn danger" data-action="suspend_account">Suspend account</button>
+            </div>
+          </div>
+          <div class="card">
+            <h3>Case note</h3>
+            <div class="empty" id="note-placeholder">No note recorded for this claim yet.</div>
+          </div>
+        </section>
+
+      </div>
+    </main>
+
+  </div>
+</div>
+
+<div class="toast-stack" id="toast-stack" aria-live="polite"></div>
+
+<script src="data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
