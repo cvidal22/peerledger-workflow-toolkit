@@ -17,7 +17,7 @@
 (function (global) {
   "use strict";
 
-  var PL = { version: "3.1.0" };
+  var PL = { version: "3.1.1" };
 
   /* ================================================================
    * dom
@@ -1469,6 +1469,25 @@
   };
 
   PL.log = function (s, m) { if (global.PL_DEBUG) console.log("[pl:" + s + "] " + m); };
+
+  /* An uncaught error in a userscript is invisible — no banner, no toast,
+     the button simply never appears and the operator assumes the toolkit is
+     broken with no way to say how. Surface it on the page once. */
+  (function () {
+    if (global.__PL_ERR_HOOK__) return;
+    global.__PL_ERR_HOOK__ = true;
+    global.addEventListener("error", function (e) {
+      if (!e || !e.message || document.getElementById("pl-runtime-error")) return;
+      if (PL.isAbort && PL.isAbort(e.error)) return;
+      var bar = document.createElement("div");
+      bar.id = "pl-runtime-error";
+      bar.textContent = "PeerLedger toolkit error: " + e.message +
+        "  —  see the console for the stack.";
+      bar.style.cssText = "position:fixed;top:0;left:0;right:0;z-index:99999;background:#8f2f2c;" +
+        "color:#fff;padding:8px 14px;font:12.5px system-ui,sans-serif;text-align:center";
+      (document.body || document.documentElement).appendChild(bar);
+    });
+  })();
 
   global.PL = PL;
 })(typeof unsafeWindow !== "undefined" ? unsafeWindow : window);

@@ -109,8 +109,11 @@ table.grid{width:100%;border-collapse:collapse}
 
 /* evidence */
 .evidence{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
-.evidence li{display:flex;align-items:center;gap:8px;border:1px solid var(--rule);border-radius:2px;padding:6px 9px;background:#f8f9fa}
-.evidence .fn{font-family:var(--mono);font-size:12px;flex:1;word-break:break-all}
+.evidence li{display:flex;align-items:center;gap:8px;flex-wrap:wrap;border:1px solid var(--rule);
+  border-radius:2px;padding:6px 9px;background:#f8f9fa}
+/* min-width:0 is required: a flex item defaults to min-content width, and with
+   break-all that collapses a long filename into one character per line. */
+.evidence .fn{font-family:var(--mono);font-size:12px;flex:1 1 160px;min-width:0;overflow-wrap:anywhere}
 .evidence .tg{font-size:10.5px;padding:1px 6px;border-radius:2px;background:var(--amber2);color:var(--amber);white-space:nowrap}
 .evidence .tg.Irrelevant{background:var(--rule2);color:var(--ink3)}
 

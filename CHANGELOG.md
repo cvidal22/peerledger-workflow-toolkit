@@ -2,6 +2,16 @@
 
 Grouped by script, because installs happen one script at a time.
 
+## 3.1.1
+
+**All scripts** — fixed: `requireCore("3.0.0")` while using APIs introduced in 3.1.0. A cached older core passed the check and then died on the first call to a method it did not have, in the console, with no button and no explanation. This is exactly the failure `requireCore` exists to prevent.
+- The bootstrap now probes the API the script needs, not merely that `PL` exists, and names the version it found
+- `build/validate.js` asserts `requireCore(...)` and `@require ?v=` both match the shipped core version, so the two cannot drift again
+
+**core/pl-core.js** — uncaught errors now surface as a banner on the page. A userscript that throws is otherwise completely invisible: no button appears and the operator has no way to say what went wrong.
+
+**docs/styles.css** — fixed: long evidence filenames collapsed to one character per line. A flex item defaults to min-content width, and `break-all` on top of that breaks every character.
+
 ## 3.1.0
 
 **core/pl-core.js (ui)** — replaced the shared docked panel with a left-edge dock of independent buttons. Each script owns one button, scoped to the pages where it applies, with its own badge and popover.

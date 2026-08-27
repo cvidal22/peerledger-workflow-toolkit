@@ -1,11 +1,11 @@
 // ==UserScript==
 // @name         PeerLedger — Signal Surfacer
 // @namespace    https://github.com/cvidal22
-// @version      3.1.0
+// @version      3.1.1
 // @description  Scans the trade transcript and claim statement for known policy-violation patterns and surfaces the matching lines for human review. Flags, never decides.
 // @author       cvidal22
 // @match        https://cvidal22.github.io/peerledger-workflow-toolkit/*
-// @require      https://cdn.jsdelivr.net/gh/cvidal22/peerledger-workflow-toolkit@main/core/pl-core.js?v=3.1.0
+// @require      https://cdn.jsdelivr.net/gh/cvidal22/peerledger-workflow-toolkit@main/core/pl-core.js?v=3.1.1
 // @grant        none
 // @run-at       document-idle
 // ==/UserScript==
@@ -67,20 +67,25 @@
  * re-fetch instead of silently serving the old build.
  * ------------------------------------------------------------------------- */
 (function () {
-  if (typeof PL !== "undefined" && PL.requireCore) return;
+  /* Checking for PL alone is not enough: a cached older core defines PL,
+     passes a loose version check, and then dies on the first call to an API
+     it does not have — in the console, where nobody is looking. Probe the
+     actual surface this script needs. */
+  if (typeof PL !== "undefined" && PL.requireCore && PL.ui && PL.ui.button) return;
   if (document.getElementById("pl-boot-error")) return;
   var b = document.createElement("div");
   b.id = "pl-boot-error";
-  b.textContent = "PeerLedger toolkit: pl-core.js did not load. " +
-    "Reinstall the scripts, or wait a few minutes if the repository was just updated.";
+  b.textContent = "PeerLedger toolkit: pl-core.js is missing or out of date " +
+    (typeof PL !== "undefined" && PL.version ? "(found " + PL.version + ") " : "") +
+    "— remove the scripts in Tampermonkey and reinstall them.";
   b.style.cssText = "position:fixed;top:0;left:0;right:0;z-index:99999;background:#8f2f2c;" +
     "color:#fff;padding:9px 14px;font:13px system-ui,sans-serif;text-align:center";
   (document.body || document.documentElement).appendChild(b);
 })();
-if (typeof PL === "undefined") return;
+if (typeof PL === "undefined" || !PL.ui || !PL.ui.button) return;
 
   if (!PL.guard("signal-surfacer")) return;
-  PL.requireCore("3.0.0");
+  PL.requireCore("3.1.1");
   PL.register("signal-surfacer", "3.0.0");
 
   var PATTERNS = [

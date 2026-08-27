@@ -105,6 +105,23 @@ files.forEach(file => {
 
 /* 10. Core must expose the API the scripts rely on. */
 const coreSrc = fs.readFileSync(CORE, "utf8");
+
+/* 10b. requireCore must name the version that actually ships. A looser
+   assertion lets a cached older core pass the check and then fail on the
+   first call to an API it does not have — silently, in the console. */
+const coreVersion = (coreSrc.match(/version:\s*"(\d+\.\d+\.\d+)"/) || [])[1];
+if (!coreVersion) failures.push("core: cannot determine PL.version");
+else {
+  files.forEach(file => {
+    const src = fs.readFileSync(file, "utf8");
+    const req = (src.match(/PL\.requireCore\("(\d+\.\d+\.\d+)"\)/) || [])[1];
+    if (req !== coreVersion) {
+      fail(file, `requireCore("${req}") does not match shipped core ${coreVersion}`);
+    }
+    const vq = (src.match(/pl-core\.js\?v=(\d+\.\d+\.\d+)/) || [])[1];
+    if (vq !== coreVersion) fail(file, `@require ?v=${vq} does not match core ${coreVersion}`);
+  });
+}
 ["adapter", "chain", "poll", "template", "lang", "review", "marker", "spa", "guard",
  "requireCore", "registry", "bus", "exclusive", "abort", "timer", "waitFor"].forEach(api => {
   if (!new RegExp(`PL\\.${api}\\s*=`).test(coreSrc)) failures.push(`core: PL.${api} is not defined`);
