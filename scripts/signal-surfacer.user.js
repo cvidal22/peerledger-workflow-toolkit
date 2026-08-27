@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         PeerLedger — Signal Surfacer
 // @namespace    https://github.com/cvidal22
-// @version      1.0.0
-// @description  Scans the trade transcript for known policy-violation patterns and surfaces the matching lines for human review. Flags, never decides.
+// @version      3.0.0
+// @description  Scans the trade transcript and claim statement for known policy-violation patterns and surfaces the matching lines for human review. Flags, never decides.
 // @author       cvidal22
 // @match        https://cvidal22.github.io/peerledger-workflow-toolkit/*
 // @require      https://cdn.jsdelivr.net/gh/cvidal22/peerledger-workflow-toolkit@main/core/pl-core.js
@@ -14,36 +14,51 @@
  * THE PROBLEM
  *
  * Policy violations — moving the trade off-platform, paying from a third-party
- * account, pressuring a counterparty into early release — are usually visible
- * in the transcript, but they are one line in forty, they are phrased a dozen
- * different ways, and by the fiftieth case of a shift attention is not what it
- * was at the tenth. Detection quality drifts with fatigue.
+ * account, pressuring a counterparty into releasing early — are usually sitting
+ * in plain sight in the transcript. But it is one line in forty, phrased a dozen
+ * different ways, and by the hundredth case of a shift your attention is not
+ * what it was at the tenth. Detection quality drifts with fatigue, and it drifts
+ * silently: nobody can see the ones you stopped noticing.
  *
  * WHAT THIS DOES
  *
- * Runs a pattern set over the transcript and the claim statement, and lists
- * every match with the line it came from and who said it.
+ * Runs a pattern set over the transcript and the claim statement and lists every
+ * match with the line it came from, who said it, and why the pattern exists.
  *
- * THE DESIGN CONSTRAINT THAT MATTERS
+ * THE CONSTRAINT THAT MATTERS MOST
  *
- * This script has no verdict. It cannot suspend, cannot rank a case as fraud,
- * cannot recommend an outcome. It answers one question — "is there a line here
- * you would want to have read?" — and hands the line back with its context.
+ * This script has no verdict. It cannot restrict an account, cannot score a case
+ * as fraud, cannot rank or recommend. It answers exactly one question — "is there
+ * a line here you would want to have read?" — and hands the line back.
  *
- * That constraint is deliberate. An operator who is shown a conclusion starts
- * agreeing with it; a pattern matcher is not competent to form one, and pattern
- * matchers do not know what they are missing. Recall is the goal, precision is
- * the operator's job, and every flag is one click from the source text so the
- * operator can dismiss it in a second when it is wrong.
+ * That limit is deliberate, and it is the most important design decision in the
+ * repository. Two reasons:
+ *
+ *   An operator shown a conclusion starts agreeing with it. Give people a
+ *     confidence score and within a week they are reviewing the score instead
+ *     of the case. The automation would then be quietly deciding outcomes it
+ *     was never validated to decide.
+ *
+ *   A pattern matcher has no idea what it is missing. It cannot see the
+ *     coercion phrased politely or the scam that used none of these words.
+ *     Something with no concept of its own blind spots has no business
+ *     producing a verdict.
+ *
+ * So it optimises for recall, accepts false positives as the cost of that, and
+ * leaves precision where it belongs. A false positive costs a second of reading.
+ * A missed off-platform solicitation costs a user their money.
+ *
+ * Every flag is one click from its source line, so dismissing a wrong one is
+ * as cheap as acting on a right one.
  */
 
 (function () {
   "use strict";
 
-  /*
-   * Patterns are intentionally broad. A false positive costs a second of
-   * reading; a missed off-platform solicitation costs a user their money.
-   */
+  if (!PL.guard("signal-surfacer")) return;
+  PL.requireCore("3.0.0");
+  PL.register("signal-surfacer", "3.0.0");
+
   var PATTERNS = [
     {
       id: "off_platform_contact",
@@ -55,48 +70,51 @@
       id: "third_party_payment",
       label: "Third-party payment indicated",
       why: "Payment from an account other than the trading account breaks the identity chain.",
-      re: /\b(my (cousin|friend|brother|sister|wife|husband|mother|father|uncle)|another account|different name|someone else('s)? account|paying for me|my other account)\b/i
+      re: /\b(my (cousin|friend|brother|sister|wife|husband|mother|father|uncle)|another account|different name|someone else'?s? account|paying for me|my other account)\b/i
     },
     {
       id: "release_pressure",
       label: "Pressure to release early",
-      why: "Urgency directed at the holder of the asset is the common lead-in to a non-payment loss.",
-      re: /\b(release it|just release|release now|release or|hurry|im not a scammer|i'?m not a scammer|trust me|open a dispute against you)\b/i
+      why: "Urgency aimed at whoever is holding the asset is the common lead-in to a non-payment loss.",
+      re: /\b(release it|just release|release now|release or|please release|hurry|i'?m not a scammer|im not a scammer|trust me|open a dispute against you)\b/i
     },
     {
       id: "bank_delay_claim",
       label: "Unverified bank-delay claim",
-      why: "Frequently used to explain a receipt that will never settle. Worth checking against the statement.",
-      re: /\b(bank (is )?slow|holiday delay|takes a while to show|already left my account|money left already|pending on my side)\b/i
+      why: "Often used to explain a receipt that will never settle. Worth checking against the statement.",
+      re: /\b(bank (is )?slow|holiday delay|takes a while to show|already left my account|money left already|bank app is down|pending on my side)\b/i
     },
     {
       id: "re_trade_request",
       label: "Request to re-trade or re-send",
       why: "Cancelling and asking for a second transfer is a known duplication pattern.",
-      re: /\b(re-?send|send (it )?again|place another order|cancel and|send to the other account)\b/i
+      re: /\b(re-?send|send it again|place another order|cancel and|send to the other account|re-?send to)\b/i
     }
   ];
+
+  var body = PL.ui.section("surfacer", "Flagged lines");
 
   function scan(c) {
     var hits = [];
     c.chat.forEach(function (m) {
       PATTERNS.forEach(function (p) {
-        if (p.re.test(m.text)) {
-          hits.push({ pattern: p, from: m.from, at: m.at, text: m.text });
-        }
+        if (p.re.test(m.text)) hits.push({ p: p, from: m.from, at: m.at, text: m.text, where: "chat" });
       });
     });
     PATTERNS.forEach(function (p) {
       if (p.re.test(c.narrative)) {
-        hits.push({ pattern: p, from: "claim statement", at: "", text: c.narrative.slice(0, 140) + "…" });
+        hits.push({ p: p, from: "claim", at: "", text: c.narrative.slice(0, 130) + "…", where: "claim" });
       }
     });
     return hits;
   }
 
-  function render(body, c) {
+  function render(c) {
     PL.ui.clear(body);
+    if (!c) { body.appendChild(PL.dom.el("div", { class: "pl-none", text: "Open a case." })); return; }
+
     var hits = scan(c);
+    body.setHeaderRight(hits.length ? hits.length + " flagged" : "clear");
 
     if (!hits.length) {
       body.appendChild(PL.dom.el("div", {
@@ -108,33 +126,24 @@
 
     hits.forEach(function (h) {
       var box = PL.dom.el("div", { class: "pl-flag" }, [
-        PL.dom.el("div", { class: "pl-ft", text: h.pattern.label }),
-        PL.dom.el("div", {
-          class: "pl-fq",
-          text: (h.from === "claim statement" ? "claim" : h.from + " " + h.at) + ": “" + h.text + "”"
-        }),
-        PL.dom.el("div", { class: "pl-hint", text: h.pattern.why })
+        PL.dom.el("div", { class: "t", text: h.p.label }),
+        PL.dom.el("div", { class: "q", text: (h.where === "claim" ? "claim" : h.from + " " + h.at) + ": “" + h.text + "”" }),
+        PL.dom.el("div", { class: "w", text: h.p.why })
       ]);
       box.addEventListener("click", function () {
-        var tab = PL.dom.qs('.tab[data-panel="' + (h.from === "claim statement" ? "claim" : "chat") + '"]');
-        if (tab) tab.click();
+        var el = PL.dom.qs(h.where === "claim" ? "#claim-narrative" : "#chat-log");
+        if (el) el.scrollIntoView({ block: "center", behavior: "smooth" });
       });
-      box.style.cursor = "pointer";
       body.appendChild(box);
     });
 
     body.appendChild(PL.dom.el("div", {
       class: "pl-hint",
-      text: hits.length + " line(s) flagged for review. The script does not decide anything — click a flag to read it in place."
+      text: "Patterns catch attention, they don't spend it. Nothing here is a finding."
     }));
 
     PL.log("surfacer", hits.length + " hits on " + c.id);
   }
 
-  var body = PL.ui.section("surfacer", "Flagged lines");
-
-  PL.watch(PL.adapter.caseKey, function () {
-    var c = PL.adapter.readCase();
-    if (c) render(body, c);
-  });
+  PL.watch(PL.adapter.caseKey, function () { render(PL.adapter.readCase()); });
 })();

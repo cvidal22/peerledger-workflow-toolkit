@@ -8,99 +8,136 @@
 <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-<div class="app">
 
-  <header class="topbar">
-    <div class="brand">PeerLedger <span>Dispute Console</span></div>
-    <div class="spacer"></div>
-    <div class="agent">agent: a.moreira · shift 09:00–18:00</div>
-  </header>
+<header class="topbar">
+  <div class="logo">PEERLEDGER<span>ops</span></div>
+  <nav class="topnav">
+    <span>Users</span><span>Orders</span><span class="on">Disputes</span><span>Recovery</span><span>Reports</span><span>Config</span>
+  </nav>
+  <div class="spacer"></div>
+  <div class="who" id="who"></div>
+</header>
 
-  <div class="demo-note">
-    Fictional demo environment. No real users, orders or data — built to show how the userscripts in
-    <a href="https://github.com/cvidal22/peerledger-workflow-toolkit">this repository</a> automate the mechanical half of a dispute review.
-  </div>
+<div class="shell">
 
-  <div class="layout">
+  <aside class="sidenav">
+    <div class="nav-group">Disputes</div>
+    <a class="nav-item" href="#/queue" data-nav="queue">Work queue</a>
+    <a class="nav-item" href="#/pool" data-nav="pool">Unassigned pool</a>
+    <a class="nav-item" href="#/closed" data-nav="closed">Closed today</a>
+    <span class="nav-item muted">Escalations</span>
+    <div class="nav-group">Recovery</div>
+    <span class="nav-item muted">Open claims</span>
+    <span class="nav-item muted">Restrictions</span>
+  </aside>
 
-    <nav class="basket" aria-label="Work basket">
-      <div class="basket-head">
-        <h2>Work basket</h2>
-        <span class="count" id="basket-count"></span>
-      </div>
-      <div class="basket-list" id="basket-list"></div>
-    </nav>
+  <main class="main" id="main">
 
-    <main class="workspace" id="workspace">
-      <div class="case-head">
-        <div class="case-title">
-          <h1 id="case-id">—</h1>
-          <span class="pill type" id="case-type"></span>
-          <span class="pill sla" id="case-sla"></span>
-        </div>
-        <div class="case-sub" id="case-sub"></div>
-        <div class="tabs" role="tablist">
-          <button class="tab" role="tab" data-panel="order" aria-selected="true">Order details</button>
-          <button class="tab" role="tab" data-panel="chat" aria-selected="false">Trade chat</button>
-          <button class="tab" role="tab" data-panel="claim" aria-selected="false">Claim &amp; evidence</button>
-          <button class="tab" role="tab" data-panel="resolve" aria-selected="false">Resolution</button>
+    <section class="view" id="view-queue">
+      <div class="crumb"><span>Disputes</span> › <span id="queue-crumb">Work queue</span></div>
+      <div class="viewhead">
+        <h1 id="queue-title">Work queue</h1>
+        <div class="spacer"></div>
+        <div class="filters">
+          <select disabled><option>All types</option></select>
+          <button class="btn" id="refresh-btn">Refresh</button>
         </div>
       </div>
+      <div class="tablewrap">
+        <table class="grid" id="queue-table">
+          <thead><tr>
+            <th>Claim</th><th>Type</th><th>Order</th><th>Value</th>
+            <th>Filed by</th><th>Priority</th><th>Age</th><th>SLA</th><th></th>
+          </tr></thead>
+          <tbody id="queue-body"></tbody>
+        </table>
+        <div class="tablefoot"><span id="queue-count"></span></div>
+      </div>
+    </section>
 
-      <div class="panels" id="panels">
+    <section class="view" id="view-case" hidden>
+      <div class="crumb"><span>Disputes</span> › <a href="#/queue">Work queue</a> › <span id="case-crumb"></span></div>
+      <div class="viewhead">
+        <h1 id="case-heading"></h1>
+        <span class="tag" id="case-status"></span>
+        <span class="tag alt" id="case-priority"></span>
+        <span class="tag" id="claim-state"></span>
+        <div class="spacer"></div>
+        <a class="btn" href="#/queue">Back to queue</a>
+      </div>
 
-        <section class="panel active" data-panel="order">
-          <div class="card">
-            <h3>Order</h3>
-            <div class="fields" id="order-fields"></div>
+      <div class="casegrid">
+        <div class="col">
+          <div class="box">
+            <div class="box-h">Order details <span class="box-h-r" id="order-ref-h"></span></div>
+            <div class="box-b"><div class="kv" id="order-kv"></div></div>
           </div>
-          <div class="card">
-            <h3>Counterparties</h3>
-            <div class="fields" id="party-fields"></div>
+          <div class="box">
+            <div class="box-h">Complainant</div>
+            <div class="box-b"><div class="kv" id="complainant-kv"></div></div>
           </div>
-        </section>
+          <div class="box">
+            <div class="box-h">Defendant</div>
+            <div class="box-b"><div class="kv" id="defendant-kv"></div></div>
+          </div>
+          <div class="box">
+            <div class="box-h">Trade chat <span class="box-h-r" id="chat-count"></span></div>
+            <div class="box-b"><div class="chat" id="chat-log"></div></div>
+          </div>
+        </div>
 
-        <section class="panel" data-panel="chat">
-          <div class="card">
-            <h3>Trade chat</h3>
-            <div class="chat" id="chat-log"></div>
-          </div>
-        </section>
-
-        <section class="panel" data-panel="claim">
-          <div class="card">
-            <h3>Complainant statement</h3>
-            <div class="narrative" id="claim-narrative"></div>
-          </div>
-          <div class="card">
-            <h3>Evidence submitted</h3>
-            <ul class="evidence-list" id="evidence-list"></ul>
-          </div>
-        </section>
-
-        <section class="panel" data-panel="resolve">
-          <div class="card">
-            <h3>Available actions</h3>
-            <div class="actions">
-              <button class="btn" data-action="request_evidence">Request further evidence</button>
-              <button class="btn" data-action="reject_claim">Reject claim</button>
-              <button class="btn primary" data-action="open_recovery">Open recovery claim</button>
-              <button class="btn danger" data-action="suspend_account">Suspend account</button>
+        <div class="col">
+          <div class="box">
+            <div class="box-h">Claim</div>
+            <div class="box-b">
+              <div class="kv" id="claim-kv"></div>
+              <p class="narrative" id="claim-narrative"></p>
             </div>
           </div>
-          <div class="card">
-            <h3>Case note</h3>
-            <div class="empty" id="note-placeholder">No note recorded for this claim yet.</div>
+
+          <div class="box">
+            <div class="box-h">Evidence <span class="box-h-r" id="evidence-count"></span></div>
+            <div class="box-b"><ul class="evidence" id="evidence-list"></ul></div>
           </div>
-        </section>
 
+          <div class="box">
+            <div class="box-h">Message to complainant</div>
+            <div class="box-b">
+              <textarea id="msg-input" placeholder="This is sent to the user."></textarea>
+              <button class="btn" id="msg-send">Send message</button>
+              <div class="sentlog" id="sent-log"></div>
+            </div>
+          </div>
+
+          <div class="box">
+            <div class="box-h">Case note</div>
+            <div class="box-b">
+              <textarea id="note-input" placeholder="Record the decision and its basis."></textarea>
+              <button class="btn" id="note-save">Save note</button>
+              <table class="notes" id="notes-table"><tbody></tbody></table>
+            </div>
+          </div>
+
+          <div class="box">
+            <div class="box-h">Resolution</div>
+            <div class="box-b">
+              <div class="actions">
+                <button class="btn" data-action="request_evidence">Request evidence</button>
+                <button class="btn primary" data-action="open_recovery">Open recovery claim</button>
+                <button class="btn danger" data-action="restrict_account">Restrict account</button>
+              </div>
+              <button class="btn danger" id="close-claim">Close claim</button>
+              <div class="rule-note">A claim cannot be closed until a case note has been saved.</div>
+            </div>
+          </div>
+        </div>
       </div>
-    </main>
+    </section>
 
-  </div>
+  </main>
 </div>
 
-<div class="toast-stack" id="toast-stack" aria-live="polite"></div>
+<div class="toasts" id="toasts" aria-live="polite"></div>
 
 <script src="data.js"></script>
 <script src="app.js"></script>

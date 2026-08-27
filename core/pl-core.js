@@ -1,343 +1,1312 @@
 /*
  * pl-core.js — shared runtime for the PeerLedger workflow scripts.
  *
- * Design rule that governs this file:
+ * The rule that governs this file:
  *
  *   Exactly one layer is allowed to know what the page looks like.
  *
- * That layer is `PL.adapter`. Everything above it — the panel UI, the hotkey
- * layer, the template composer — operates on a plain `Case` object and has no
- * idea whether the data came from a DOM scrape, an API, or a fixture. When the
- * host application ships a redesign, the adapter is the only thing that breaks,
- * and it is roughly forty lines.
+ * That layer is `PL.adapter`. Everything above it — panel, overlay, hotkeys,
+ * template composer, poller — operates on plain `Case` and `QueueRow` objects
+ * and has no idea whether the data came from a DOM scrape, an API or a fixture.
  *
- * That boundary is the whole reason a set of scripts like this survives contact
- * with a product team that ships weekly.
+ * When the host application ships a redesign, the adapter is the only thing
+ * that breaks, and it is about sixty lines. Five scripts keep working.
  *
  * Exposed as `window.PL`.
  */
 (function (global) {
   "use strict";
 
-  var PL = {};
+  var PL = { version: "3.0.0" };
 
-  /* ------------------------------------------------------------------ *
-   * dom — thin helpers. No business logic lives here.
-   * ------------------------------------------------------------------ */
+  /* ================================================================
+   * dom
+   * ================================================================ */
 
   PL.dom = {
-    qs: function (sel, root) { return (root || document).querySelector(sel); },
-    qsa: function (sel, root) {
-      return Array.prototype.slice.call((root || document).querySelectorAll(sel));
-    },
-    text: function (sel, root) {
-      var el = PL.dom.qs(sel, root);
-      return el ? el.textContent.trim() : "";
-    },
-    el: function (tag, attrs, children) {
-      var node = document.createElement(tag);
+    qs: function (s, r) { return (r || document).querySelector(s); },
+    qsa: function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); },
+    text: function (s, r) { var e = PL.dom.qs(s, r); return e ? e.textContent.trim() : ""; },
+    el: function (tag, attrs, kids) {
+      var n = document.createElement(tag);
       Object.keys(attrs || {}).forEach(function (k) {
-        if (k === "class") node.className = attrs[k];
-        else if (k === "html") node.innerHTML = attrs[k];
-        else if (k === "text") node.textContent = attrs[k];
-        else if (k.indexOf("on") === 0 && typeof attrs[k] === "function") {
-          node.addEventListener(k.slice(2).toLowerCase(), attrs[k]);
-        } else node.setAttribute(k, attrs[k]);
+        if (k === "class") n.className = attrs[k];
+        else if (k === "html") n.innerHTML = attrs[k];
+        else if (k === "text") n.textContent = attrs[k];
+        else if (k.indexOf("on") === 0 && typeof attrs[k] === "function") n.addEventListener(k.slice(2).toLowerCase(), attrs[k]);
+        else n.setAttribute(k, attrs[k]);
       });
-      (children || []).forEach(function (c) {
-        node.appendChild(typeof c === "string" ? document.createTextNode(c) : c);
+      (kids || []).forEach(function (c) {
+        n.appendChild(typeof c === "string" ? document.createTextNode(c) : c);
       });
-      return node;
+      return n;
     },
     style: function (id, css) {
       if (document.getElementById(id)) return;
       var s = document.createElement("style");
-      s.id = id;
-      s.textContent = css;
+      s.id = id; s.textContent = css;
       document.head.appendChild(s);
     }
   };
 
-  /* ------------------------------------------------------------------ *
-   * watch — fires a callback whenever the operator moves to another case.
+  /* ================================================================
+   * adapter — the ONLY DOM-coupled code in the project.
    *
-   * Single-page applications do not reload, so a userscript that only runs
-   * on document-ready works once and then silently goes stale. This watches
-   * the case identifier and re-runs on change, debounced so a burst of DOM
-   * mutations produces one call rather than forty.
-   * ------------------------------------------------------------------ */
-
-  PL.watch = function (getKey, onChange, opts) {
-    opts = opts || {};
-    var debounceMs = opts.debounceMs || 60;
-    var last = null;
-    var timer = null;
-
-    function check() {
-      var key = getKey();
-      if (!key || key === last) return;
-      last = key;
-      onChange(key);
-    }
-
-    var observer = new MutationObserver(function () {
-      clearTimeout(timer);
-      timer = setTimeout(check, debounceMs);
-    });
-
-    observer.observe(document.body, { childList: true, subtree: true, attributes: true });
-    check();
-    return function stop() { observer.disconnect(); };
-  };
-
-  /* ------------------------------------------------------------------ *
-   * adapter — the only DOM-coupled code in the project.
-   *
-   * Reads the host page and returns a normalised `Case`:
-   *
-   *   { id, type, typeLabel, filedBy, order:{}, parties:{}, narrative, evidence:[], chat:[] }
-   *
-   * Note what it does NOT do: it makes no decisions, applies no rules and
-   * ranks nothing. It converts pixels into data and stops.
-   * ------------------------------------------------------------------ */
+   * Converts pixels into data and stops. It makes no decisions, ranks
+   * nothing and filters nothing.
+   * ================================================================ */
 
   PL.adapter = {
-    caseKey: function () {
-      var ws = PL.dom.qs("#workspace");
-      return ws ? ws.getAttribute("data-claim-id") : null;
+    view: function () {
+      var m = PL.dom.qs("#main");
+      return m ? m.getAttribute("data-view") : null;
     },
 
-    readFields: function (containerSel) {
+    caseKey: function () {
+      var m = PL.dom.qs("#main");
+      return m ? m.getAttribute("data-claim-id") : null;
+    },
+
+    /* Queue rows, as shown. Whether a row is claimable is a property of the
+       view, not a judgement this function makes. */
+    readQueue: function () {
+      return PL.dom.qsa("#queue-body tr[data-row-claim]").map(function (tr) {
+        var td = tr.children;
+        return {
+          id: tr.getAttribute("data-row-claim"),
+          typeLabel: td[1].textContent.trim(),
+          orderRef: td[2].textContent.trim(),
+          value: td[3].textContent.trim(),
+          filedBy: td[4].textContent.trim(),
+          priority: td[5].textContent.trim(),
+          age: td[6].textContent.trim(),
+          sla: td[7].textContent.trim(),
+          claimButton: tr.querySelector("[data-claim-action]")
+        };
+      });
+    },
+
+    /* The host renders "not applicable" as a dash. Normalising it to an empty
+       string here is what lets PL.template throw on a genuinely absent value
+       instead of quietly emitting "released -" into a user's message. Host
+       placeholder conventions are a presentation detail, so they get resolved
+       at the boundary rather than leaking into every consumer. */
+    readKv: function (sel) {
       var out = {};
-      PL.dom.qsa(containerSel + " .field").forEach(function (f) {
-        var k = PL.dom.text(".k", f);
-        out[k] = PL.dom.text(".v", f);
+      PL.dom.qsa(sel + " > div").forEach(function (d) {
+        var v = PL.dom.text(".v", d);
+        out[PL.dom.text(".k", d)] = (v === "-" || v === "—") ? "" : v;
       });
       return out;
     },
 
     readCase: function () {
-      var ws = PL.dom.qs("#workspace");
-      if (!ws || !ws.getAttribute("data-claim-id")) return null;
+      var main = PL.dom.qs("#main");
+      if (!main || !main.getAttribute("data-claim-id")) return null;
 
-      var order = PL.adapter.readFields("#order-fields");
-      var parties = PL.adapter.readFields("#party-fields");
+      var o = PL.adapter.readKv("#order-kv");
+      var cp = PL.adapter.readKv("#complainant-kv");
+      var df = PL.adapter.readKv("#defendant-kv");
+      var cl = PL.adapter.readKv("#claim-kv");
+
+      function party(k) {
+        return {
+          role: k["Role"] || "", handle: k["Handle"] || "", uid: k["User ID"] || "",
+          tier: k["Tier"] || "", tenure: k["Account age"] || "",
+          orders: parseInt(k["Completed orders"], 10) || 0,
+          disputes: parseInt(k["Prior disputes"], 10) || 0,
+          country: k["KYC country"] || ""
+        };
+      }
 
       return {
-        id: ws.getAttribute("data-claim-id"),
-        type: ws.getAttribute("data-claim-type"),
-        typeLabel: PL.dom.text("#case-type"),
-        filedBy: (PL.dom.text("#case-sub").match(/Filed by (\w+)/) || [])[1] || "",
+        id: main.getAttribute("data-claim-id"),
+        type: main.getAttribute("data-claim-type"),
+        typeLabel: cl["Claim type"] || "",
+        filedBy: cl["Filed by"] || "",
+        openedAt: cl["Opened"] || "",
+        sla: cl["SLA"] || "",
         order: {
-          ref: order["Order reference"] || "",
-          status: order["Status"] || "",
-          asset: order["Asset"] || "",
-          fiatValue: order["Fiat value"] || "",
-          price: order["Unit price"] || "",
-          method: order["Payment method"] || "",
-          createdAt: order["Created"] || "",
-          releasedAt: order["Released"] || ""
+          ref: o["Order reference"] || "", status: o["Status"] || "",
+          pair: o["Pair"] || "", side: o["Side"] || "",
+          crypto: o["Crypto quantity"] || "", fiat: o["Fiat amount"] || "",
+          price: o["Unit price"] || "", method: o["Payment method"] || "",
+          createdAt: o["Created"] || "", releasedAt: o["Released"] || ""
         },
-        parties: {
-          seller: {
-            handle: parties["Seller"] || "",
-            tenure: parties["Seller tenure"] || "",
-            orders: parseInt(parties["Seller orders"], 10) || 0,
-            disputes: parseInt(parties["Seller disputes"], 10) || 0
-          },
-          buyer: {
-            handle: parties["Buyer"] || "",
-            tenure: parties["Buyer tenure"] || "",
-            orders: parseInt(parties["Buyer orders"], 10) || 0,
-            disputes: parseInt(parties["Buyer disputes"], 10) || 0
-          }
-        },
+        complainant: party(cp),
+        defendant: party(df),
         narrative: PL.dom.text("#claim-narrative"),
         evidence: PL.dom.qsa("#evidence-list li").map(function (li) {
-          return {
-            kind: PL.dom.text(".kind", li),
-            label: li.textContent.replace(PL.dom.text(".kind", li), "").trim()
-          };
+          return { label: PL.dom.text(".fn", li), tag: PL.dom.text(".tg", li) };
         }),
         chat: PL.dom.qsa("#chat-log .msg").map(function (m) {
-          return {
-            from: m.getAttribute("data-from"),
-            at: PL.dom.text(".at", m),
-            text: PL.dom.text(".bubble", m)
-          };
+          return { from: m.getAttribute("data-from"), at: PL.dom.text(".at", m), text: PL.dom.text(".bub", m) };
         })
       };
+    },
+
+    noteField: function () { return PL.dom.qs("#note-input"); },
+    messageField: function () { return PL.dom.qs("#message-input"); },
+    sendButton: function () { return PL.dom.qs("#message-send"); },
+    saveNoteButton: function () { return PL.dom.qs("#note-save"); },
+    closeButton: function () { return PL.dom.qs("#claim-close"); },
+
+    claimState: function () {
+      var m = PL.dom.qs("#main");
+      return m ? m.getAttribute("data-claim-state") : null;
+    },
+
+    /* Note history, used to verify that a write actually landed. Checking the
+       host's own rendered record is the only honest confirmation available —
+       a click handler returning without error proves nothing. */
+    noteHistory: function () {
+      return PL.dom.qsa("#notes-table tbody tr").map(function (tr) {
+        var td = tr.children;
+        return td.length < 2 ? null : { meta: td[0].textContent.trim(), text: td[1].textContent.trim() };
+      }).filter(Boolean);
     }
   };
 
-  /* ------------------------------------------------------------------ *
-   * ui — one docked panel, shared by every script.
+  /* ================================================================
+   * watch — re-run on case change.
    *
-   * Each script registers a section. They stack in registration order in a
-   * single panel rather than each script inventing its own floating window,
-   * which is what turns a toolkit into visual noise.
-   * ------------------------------------------------------------------ */
+   * Single-page apps do not reload. A script bound to document-ready runs
+   * once and then quietly goes stale, which is worse than not running,
+   * because the operator keeps trusting it.
+   * ================================================================ */
 
-  var PANEL_CSS = [
-    "#pl-panel{position:fixed;top:0;right:0;width:340px;height:100vh;background:#fff;",
-    "border-left:1px solid #d6dae1;box-shadow:-2px 0 12px rgba(0,0,0,.06);z-index:9999;",
-    "display:flex;flex-direction:column;font:13px/1.45 system-ui,-apple-system,sans-serif;color:#16181d}",
-    "#pl-panel.pl-collapsed{transform:translateX(calc(100% - 34px))}",
-    "#pl-panel-head{display:flex;align-items:center;gap:8px;padding:9px 12px;background:#16181d;color:#fff;flex:0 0 auto}",
-    "#pl-panel-head b{font-size:12px;letter-spacing:.05em;text-transform:uppercase;font-weight:650}",
-    "#pl-panel-head .pl-sp{flex:1}",
-    "#pl-panel-head button{background:transparent;border:0;color:#fff;cursor:pointer;font-size:15px;padding:0 4px;line-height:1}",
-    "#pl-panel-body{overflow-y:auto;flex:1;min-height:0}",
-    ".pl-sec{border-bottom:1px solid #e6e9ee;padding:12px 14px}",
-    ".pl-sec h4{margin:0 0 9px;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:#545a66;font-weight:650}",
-    ".pl-row{display:flex;justify-content:space-between;gap:10px;padding:3px 0;font-size:12.5px}",
-    ".pl-row .pl-k{color:#868d9a}",
-    ".pl-row .pl-v{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;text-align:right}",
-    ".pl-flag{border-left:3px solid #9a5116;background:#fdf1e5;padding:7px 9px;margin-bottom:7px;border-radius:2px}",
-    ".pl-flag .pl-ft{font-weight:650;font-size:12px;color:#9a5116}",
-    ".pl-flag .pl-fq{font-size:12px;color:#545a66;margin-top:3px;font-style:italic}",
-    ".pl-none{color:#868d9a;font-size:12.5px}",
-    ".pl-btn{font:inherit;font-size:12.5px;padding:6px 10px;border:1px solid #d6dae1;background:#fff;",
-    "border-radius:3px;cursor:pointer;margin:0 6px 6px 0}",
-    ".pl-btn:hover{border-color:#868d9a}",
-    ".pl-btn.pl-on{background:#2f4b7c;border-color:#2f4b7c;color:#fff}",
-    ".pl-out{width:100%;min-height:150px;font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;",
-    "border:1px solid #d6dae1;border-radius:3px;padding:8px;resize:vertical;margin-top:8px}",
-    ".pl-hint{font-size:11.5px;color:#868d9a;margin-top:6px}",
-    ".pl-quote{font-size:12px;color:#545a66;border-left:2px solid #d6dae1;padding-left:8px;margin:4px 0}"
-  ].join("");
-
-  PL.ui = {
-    _sections: {},
-
-    panel: function () {
-      var p = document.getElementById("pl-panel");
-      if (p) return p;
-
-      PL.dom.style("pl-core-css", PANEL_CSS);
-
-      p = PL.dom.el("div", { id: "pl-panel" });
-      var head = PL.dom.el("div", { id: "pl-panel-head" }, [
-        PL.dom.el("b", { text: "Toolkit" }),
-        PL.dom.el("span", { class: "pl-sp" }),
-        PL.dom.el("button", {
-          title: "Collapse panel (Alt+\\)",
-          text: "›",
-          onclick: function () { p.classList.toggle("pl-collapsed"); }
-        })
-      ]);
-      p.appendChild(head);
-      p.appendChild(PL.dom.el("div", { id: "pl-panel-body" }));
-      document.body.appendChild(p);
-
-      PL.hotkeys.bind("alt+\\", function () { p.classList.toggle("pl-collapsed"); });
-      return p;
-    },
-
-    section: function (key, title) {
-      PL.ui.panel();
-      if (PL.ui._sections[key]) return PL.ui._sections[key];
-      var body = PL.dom.el("div");
-      var sec = PL.dom.el("div", { class: "pl-sec", "data-pl-section": key }, [
-        PL.dom.el("h4", { text: title }),
-        body
-      ]);
-      document.getElementById("pl-panel-body").appendChild(sec);
-      PL.ui._sections[key] = body;
-      return body;
-    },
-
-    rows: function (pairs) {
-      return pairs.map(function (p) {
-        return PL.dom.el("div", { class: "pl-row" }, [
-          PL.dom.el("span", { class: "pl-k", text: p[0] }),
-          PL.dom.el("span", { class: "pl-v", text: p[1] })
-        ]);
-      });
-    },
-
-    clear: function (node) { while (node.firstChild) node.removeChild(node.firstChild); }
+  PL.watch = function (getKey, onChange, opts) {
+    opts = opts || {};
+    var last = null, timer = null;
+    function check() {
+      var k = getKey();
+      if (k === last) return;
+      last = k;
+      onChange(k);
+    }
+    new MutationObserver(function () {
+      clearTimeout(timer);
+      timer = setTimeout(check, opts.debounceMs || 60);
+    }).observe(document.body, { childList: true, subtree: true, attributes: true });
+    window.addEventListener("hashchange", function () { setTimeout(check, 40); });
+    check();
   };
 
-  /* ------------------------------------------------------------------ *
-   * hotkeys — one keydown listener for the whole toolkit.
-   * ------------------------------------------------------------------ */
+  /* ================================================================
+   * poll — interval work with backoff and a hard stop.
+   *
+   * Every polling script eventually meets a page that has logged out, a
+   * queue that stays empty for an hour, or a tab left open overnight. The
+   * ones that survive have three properties: they back off when there is
+   * nothing to do, they stop entirely after a run of empty cycles, and
+   * they never overlap their own runs.
+   * ================================================================ */
 
-  PL.hotkeys = (function () {
-    var map = {};
-    var attached = false;
+  PL.poll = function (fn, opts) {
+    opts = opts || {};
+    var base = opts.baseMs || 5000;
+    var max = opts.maxMs || 60000;
+    var giveUpAfter = opts.giveUpAfter || 40;
+    var onStop = opts.onStop || function () {};
 
-    function normalise(e) {
-      var parts = [];
-      if (e.altKey) parts.push("alt");
-      if (e.ctrlKey) parts.push("ctrl");
-      if (e.shiftKey) parts.push("shift");
-      parts.push(String(e.key).toLowerCase());
-      return parts.join("+");
+    var wait = base, empties = 0, running = false, stopped = false, timer = null;
+
+    function schedule() {
+      if (stopped) return;
+      timer = setTimeout(tick, wait);
     }
 
-    function attach() {
-      if (attached) return;
-      attached = true;
-      document.addEventListener("keydown", function (e) {
-        var tag = (e.target.tagName || "").toLowerCase();
-        if (tag === "input" || tag === "textarea" || e.target.isContentEditable) return;
-        var fn = map[normalise(e)];
-        if (fn) { e.preventDefault(); fn(e); }
+    function tick() {
+      if (stopped || running) return;
+      running = true;
+      Promise.resolve()
+        .then(fn)
+        .then(function (didWork) {
+          if (didWork) { wait = base; empties = 0; }
+          else {
+            empties++;
+            wait = Math.min(Math.round(wait * 1.6), max);
+            if (empties >= giveUpAfter) { api.stop("idle"); return; }
+          }
+        })
+        .catch(function (err) {
+          empties++;
+          wait = Math.min(Math.round(wait * 2), max);
+          PL.log("poll", "error: " + err.message);
+        })
+        .then(function () { running = false; schedule(); });
+    }
+
+    var api = {
+      start: function () { if (stopped) { stopped = false; wait = base; empties = 0; } schedule(); return api; },
+      stop: function (reason) { stopped = true; clearTimeout(timer); onStop(reason || "manual"); return api; },
+      running: function () { return !stopped; },
+      waitMs: function () { return wait; }
+    };
+    return api;
+  };
+
+  /* ================================================================
+   * sequence — ordered multi-step actions with verification between steps.
+   *
+   * Reading a page is forgiving; a bad read shows a wrong number and the
+   * operator notices. Multi-step *writes* are not forgiving, because the
+   * failure mode is not "nothing happened" — it is "half of it happened",
+   * and half is often worse than none. A claim closed without its remark
+   * saved is worse than an untouched claim: the queue looks handled, the
+   * audit trail is wrong, and nobody knows to go back.
+   *
+   * So the contract here is deliberately strict:
+   *
+   *   Verify before continuing. Every step declares how to check that it
+   *     actually took effect. The next step does not start until that check
+   *     passes. Clicking a button is not evidence that anything happened.
+   *
+   *   Halt, never retry. If a verification fails the sequence stops where it
+   *     is and reports exactly which steps completed. It does not retry,
+   *     because a step that may have half-applied is not safe to repeat, and
+   *     it does not roll back, because it has no authority to undo a message
+   *     that may already have reached someone.
+   *
+   *   Irreversible last. Step order is the caller's responsibility, but the
+   *     runner is built assuming the least recoverable action is at the end,
+   *     so a mid-sequence halt leaves the most recoverable state.
+   *
+   *   One at a time. A sequence in flight refuses to start again. Double-fire
+   *     from an impatient second keypress is the most common way these things
+   *     send two messages.
+   *
+   * Steps: { label, run: fn -> void|Promise, verify: fn -> boolean }
+   * ================================================================ */
+
+  PL.sequence = function (steps, opts) {
+    opts = opts || {};
+    var settleMs = opts.settleMs || 120;
+    var inFlight = false;
+
+    function verifyWithin(step, budgetMs) {
+      var start = Date.now();
+      return new Promise(function (resolve) {
+        (function attempt() {
+          var ok = false;
+          try { ok = !!step.verify(); } catch (e) { ok = false; }
+          if (ok) return resolve(true);
+          if (Date.now() - start > budgetMs) return resolve(false);
+          setTimeout(attempt, 40);
+        })();
       });
     }
 
     return {
-      bind: function (combo, fn) { map[combo.toLowerCase()] = fn; attach(); },
-      list: function () { return Object.keys(map); }
+      inFlight: function () { return inFlight; },
+
+      run: function (onProgress) {
+        if (inFlight) return Promise.resolve({ ok: false, halted: "already running", done: [] });
+        inFlight = true;
+
+        var done = [];
+        var chain = Promise.resolve();
+
+        steps.forEach(function (step, i) {
+          chain = chain.then(function (halted) {
+            if (halted) return halted;
+
+            onProgress({ index: i, label: step.label, state: "running" });
+
+            return Promise.resolve()
+              .then(function () { return step.run(); })
+              .then(function () { return new Promise(function (r) { setTimeout(r, settleMs); }); })
+              .then(function () { return verifyWithin(step, opts.verifyMs || 1200); })
+              .then(function (ok) {
+                if (!ok) {
+                  onProgress({ index: i, label: step.label, state: "failed" });
+                  return step.label;
+                }
+                done.push(step.label);
+                onProgress({ index: i, label: step.label, state: "done" });
+                return null;
+              })
+              .catch(function (err) {
+                onProgress({ index: i, label: step.label, state: "failed", error: err.message });
+                return step.label;
+              });
+          });
+        });
+
+        return chain.then(function (halted) {
+          inFlight = false;
+          return { ok: !halted, halted: halted || null, done: done };
+        });
+      }
+    };
+  };
+
+  /* ================================================================
+   * waitFor — resolve when a condition becomes true, or reject.
+   *
+   * The single most common cause of a broken chained macro is firing the
+   * next step before the previous one finished. Fixed sleeps are the usual
+   * fix and they are wrong in both directions: too short on a slow morning,
+   * and wasted time on every other run. Polling a condition costs nothing
+   * and is correct at both extremes.
+   * ================================================================ */
+
+  PL.waitFor = function (cond, opts) {
+    opts = opts || {};
+    var timeout = opts.timeoutMs || 8000;
+    var every = opts.everyMs || 60;
+    var label = opts.label || "condition";
+    return new Promise(function (resolve, reject) {
+      var t0 = Date.now();
+      (function tick() {
+        var ok;
+        try { ok = cond(); } catch (e) { ok = false; }
+        if (ok) return resolve(true);
+        if (Date.now() - t0 > timeout) return reject(new Error("timed out waiting for " + label));
+        setTimeout(tick, every);
+      })();
+    });
+  };
+
+  /* ================================================================
+   * chain — run a sequence of real actions as one operator gesture.
+   *
+   * The naive version of this is three clicks in a row behind one keystroke.
+   * It works on a fast day and fails silently on a slow one, and its failures
+   * are expensive because they are *partial*: a message went out, nothing was
+   * recorded, and the claim is still open. Nobody downstream can tell that
+   * happened by looking.
+   *
+   * A browser UI offers no transactions, so the properties have to be built:
+   *
+   *   PREFLIGHT   Conditions checked before anything runs. Cheaper to refuse
+   *               at step zero than to abort at step three, and refusing
+   *               early is the only way to avoid partial state entirely.
+   *
+   *   VERIFY      Each step declares how to confirm it actually landed —
+   *               a note appearing in the history, a status flipping. The
+   *               click returning is not evidence that the save persisted.
+   *
+   *   ABORT       On a failed verification the chain stops rather than
+   *               continuing into steps that assume it worked.
+   *
+   *   REPORT      On abort, the operator is told exactly which steps
+   *               committed and which did not. Silent partial failure is
+   *               the worst outcome available here, worse than not running.
+   *
+   *   LOCK        One chain at a time, globally. Double keypresses, impatient
+   *               re-triggers and overlapping runs all collapse to one.
+   *
+   *   ONCE        A chain that has completed on a case will not re-run on
+   *               that case without an explicit reset.
+   *
+   *   CONFIRM     Steps flagged irreversible require an explicit yes.
+   *
+   * Steps: { name, run, verify?, irreversible?, undoable? }
+   * ================================================================ */
+
+  PL.chain = (function () {
+    var lock = false;
+    var completed = {};
+
+    function run(spec) {
+      var steps = spec.steps || [];
+      var key = spec.key || null;
+      var onProgress = spec.onProgress || function () {};
+      var confirm = spec.confirm || function () { return Promise.resolve(true); };
+
+      var log = steps.map(function (s) { return { name: s.name, state: "pending" }; });
+      function emit(msg) { onProgress(log.slice(), msg); }
+
+      if (lock) {
+        return Promise.resolve({ ok: false, reason: "A chain is already running.", log: log });
+      }
+      if (key && completed[key]) {
+        return Promise.resolve({ ok: false, reason: "Already run on " + key + ". Reset to run again.", log: log });
+      }
+
+      // Preflight: every check must pass before any step executes.
+      var failed = (spec.preflight || []).filter(function (p) { return !p.check(); });
+      if (failed.length) {
+        return Promise.resolve({
+          ok: false,
+          reason: "Preflight failed — nothing ran.",
+          detail: failed.map(function (f) { return f.label; }),
+          log: log
+        });
+      }
+
+      lock = true;
+      var i = 0;
+
+      function step() {
+        if (i >= steps.length) {
+          if (key) completed[key] = true;
+          lock = false;
+          emit("Chain complete.");
+          return Promise.resolve({ ok: true, log: log });
+        }
+
+        var s = steps[i];
+        var entry = log[i];
+
+        var gate = s.irreversible
+          ? confirm(s, log.slice())
+          : Promise.resolve(true);
+
+        return gate.then(function (yes) {
+          if (!yes) {
+            entry.state = "declined";
+            lock = false;
+            return {
+              ok: false,
+              reason: "Stopped at “" + s.name + "” — you declined the irreversible step.",
+              log: log,
+              committed: log.filter(function (l) { return l.state === "done"; }).map(function (l) { return l.name; })
+            };
+          }
+
+          entry.state = "running";
+          emit("Running: " + s.name);
+
+          return Promise.resolve()
+            .then(function () { return s.run(); })
+            .then(function () {
+              if (!s.verify) return true;
+              return PL.waitFor(s.verify, { label: s.name, timeoutMs: s.timeoutMs || 8000 });
+            })
+            .then(function () {
+              entry.state = "done";
+              emit(s.name + " confirmed.");
+              i++;
+              return step();
+            })
+            .catch(function (err) {
+              entry.state = "failed";
+              entry.error = err.message;
+              lock = false;
+              var done = log.filter(function (l) { return l.state === "done"; }).map(function (l) { return l.name; });
+              return {
+                ok: false,
+                reason: "Failed at “" + s.name + "”: " + err.message,
+                log: log,
+                committed: done,
+                warning: done.length
+                  ? "These steps already committed and were NOT undone: " + done.join(", ") + "."
+                  : null
+              };
+            });
+        });
+      }
+
+      emit("Preflight passed.");
+      return step();
+    }
+
+    return {
+      run: run,
+      isLocked: function () { return lock; },
+      hasRun: function (k) { return !!completed[k]; },
+      reset: function (k) { delete completed[k]; }
     };
   })();
 
-  /* ------------------------------------------------------------------ *
-   * template — token substitution with strict failure.
+  /* ================================================================
+   * spa — the layer that exists because reactive single-page apps
+   *       actively resist naive automation.
    *
-   * An unresolved token throws rather than rendering "Dear {{name}}" into a
-   * message an operator then sends. Loud failure beats quiet embarrassment.
-   * ------------------------------------------------------------------ */
+   * Every function here replaces something that "should" work and doesn't.
+   * None of it is clever; all of it is scar tissue.
+   * ================================================================ */
 
-  PL.template = {
-    render: function (tpl, vars) {
-      return tpl.replace(/\{\{(\w+)\}\}/g, function (_, key) {
-        if (!(key in vars) || vars[key] === undefined || vars[key] === null) {
-          throw new Error("Template token not supplied: " + key);
+  PL.spa = {
+    /* Assigning .value is ignored by frameworks that track their own state,
+       so the write goes through the native prototype setter and then the
+       events the framework is actually listening for. */
+    set: function (field, value) {
+      if (!field) return false;
+      var proto = Object.getPrototypeOf(field);
+      var desc = Object.getOwnPropertyDescriptor(proto, "value");
+      if (desc && desc.set) desc.set.call(field, value);
+      else field.value = value;
+      field.dispatchEvent(new Event("input", { bubbles: true }));
+      field.dispatchEvent(new Event("change", { bubbles: true }));
+      if (field.type === "number") field.dispatchEvent(new Event("blur", { bubbles: true }));
+      return true;
+    },
+
+    /* A bare .click() is frequently ignored by components that bind to
+       pointer events. The full sequence is what a real mouse produces. */
+    click: function (el) {
+      if (!el) return false;
+      ["pointerdown", "mousedown", "mouseup", "click"].forEach(function (type) {
+        var Ctor = type.indexOf("pointer") === 0 && global.PointerEvent ? global.PointerEvent : global.MouseEvent;
+        el.dispatchEvent(new Ctor(type, { bubbles: true, cancelable: true, view: global }));
+      });
+      return true;
+    },
+
+    /* Navigation chrome often contains hidden copies of on-page label text.
+       Every lookup filters for actual visibility or the script ends up
+       clicking a menu item instead of a button. */
+    visible: function (el) {
+      if (!el || el.disabled) return false;
+      if (el.hidden || (el.closest && el.closest("[hidden]"))) return false;
+
+      var cs = global.getComputedStyle ? global.getComputedStyle(el) : null;
+      if (cs && (cs.display === "none" || cs.visibility === "hidden")) return false;
+
+      /* offsetParent === null is the cheap visibility test and it is correct
+         for ordinary flow content. It is WRONG for position:fixed elements,
+         which report null while being plainly on screen — so injected panels
+         and teleported menus need the computed-style path above plus a size
+         check instead. Using offsetParent alone is why injected UI sometimes
+         looks invisible to its own script. */
+      if (cs && cs.position === "fixed") {
+        var fr = el.getBoundingClientRect ? el.getBoundingClientRect() : null;
+        return !fr || fr.width > 0 || fr.height > 0;
+      }
+      if ("offsetParent" in el && el.offsetParent === null && cs && cs.position !== "fixed") {
+        /* jsdom does not implement layout, so fall through rather than
+           reporting everything invisible under test. */
+        if (typeof el.getBoundingClientRect !== "function") return false;
+        var r = el.getBoundingClientRect();
+        if (r.width === 0 && r.height === 0 && cs.position !== "fixed") {
+          return !!(el.ownerDocument && el.ownerDocument.defaultView &&
+                    !el.ownerDocument.defaultView.navigator.userAgent.match(/jsdom/i))
+            ? false : true;
         }
-        return vars[key];
+      }
+      return true;
+    },
+
+    /* Menus are frequently teleported to <body>, so several may exist at
+       once. When more than one matches, take the visible one nearest the
+       element that opened it rather than the first in document order. */
+    nearest: function (candidates, anchor) {
+      var list = candidates.filter(PL.spa.visible);
+      if (list.length < 2 || !anchor || !anchor.getBoundingClientRect) return list[0] || null;
+      var y = anchor.getBoundingClientRect().top;
+      return list.sort(function (a, b) {
+        return Math.abs(a.getBoundingClientRect().top - y) - Math.abs(b.getBoundingClientRect().top - y);
+      })[0];
+    },
+
+    byText: function (selector, text, root) {
+      var t = String(text).toLowerCase();
+      return PL.dom.qsa(selector, root).filter(function (el) {
+        return PL.spa.visible(el) && el.textContent.trim().toLowerCase() === t;
+      })[0] || null;
+    },
+
+    /* Layout arrives before data. Waiting for the page to "look ready" is a
+       guess; waiting for a specific field to hold a real value is a fact. */
+    ready: function (probe, opts) {
+      return PL.waitFor(function () {
+        var v = typeof probe === "function" ? probe() : PL.dom.text(probe);
+        return !!v && v !== "-" && v !== "—" && !/^\s*(loading|--)\s*$/i.test(v);
+      }, opts || { label: "case data", timeoutMs: 10000 });
+    }
+  };
+
+  /* ================================================================
+   * timer — an interval that survives a backgrounded tab.
+   *
+   * Chrome throttles setTimeout/setInterval in background tabs to roughly
+   * one tick per minute. A queue watcher built on setInterval therefore
+   * stops watching the moment the operator looks at anything else, which
+   * is precisely when they needed it. A Worker gets its own thread and
+   * is not throttled the same way.
+   * ================================================================ */
+
+  PL.timer = function (intervalMs, fn) {
+    var worker = null, fallback = null;
+    try {
+      var src = "let h=null;onmessage=e=>{if(e.data.stop){clearInterval(h);h=null;return;}" +
+        "clearInterval(h);h=setInterval(()=>postMessage('tick'),e.data.every);};";
+      worker = new Worker(URL.createObjectURL(new Blob([src], { type: "application/javascript" })));
+      worker.onmessage = function () { fn(); };
+      worker.postMessage({ every: intervalMs });
+    } catch (e) {
+      PL.log("timer", "worker unavailable, falling back to setInterval");
+      fallback = setInterval(fn, intervalMs);
+    }
+    return {
+      stop: function () {
+        if (worker) { worker.postMessage({ stop: true }); worker.terminate(); worker = null; }
+        if (fallback) { clearInterval(fallback); fallback = null; }
+      },
+      viaWorker: function () { return !!worker; }
+    };
+  };
+
+  /* ================================================================
+   * lang — per-party language resolution.
+   *
+   * The two parties in a dispute frequently do not share a language, and
+   * neither necessarily shares the operator's. Detecting "the language of
+   * the case" is therefore the wrong unit: it has to be resolved per party,
+   * from what that party actually wrote.
+   *
+   * THE SPLIT THAT MATTERS
+   *
+   *   Outbound messages are translated into each recipient's own language.
+   *   Internal case notes are NEVER translated. They stay in one language
+   *   so that any colleague or auditor can pick up any case cold.
+   *
+   * Getting that backwards produces an audit trail nobody can read, which
+   * is a far more expensive mistake than an awkward translation.
+   *
+   * Detection is confidence-scored; below threshold it falls back to the
+   * house language rather than guessing, because a message in the wrong
+   * language is worse than a message in the default one.
+   * ================================================================ */
+
+  PL.lang = (function () {
+    var DEFAULT = "en";
+    var THRESHOLD = 0.7;
+    var cache = {};
+    var CACHE_MS = 60000;
+
+    /* Marker-based scoring. Deliberately small and inspectable rather than
+       a dependency — the point is the architecture around it, and a wrong
+       guess degrades to the default instead of failing. */
+    /* DISTINCTIVE markers only. The first version counted common words and
+       got Portuguese wrong: pt and es share "banco", "pedido", "por favor",
+       "comprador", "vendedor", so a plainly Portuguese message split its score
+       across two languages, fell under the threshold, and defaulted to English.
+       A token that appears in more than one candidate language carries no
+       signal and is excluded. */
+    var MARKERS = {
+      pt: /\b(não|você|obrigad\w*|já|muito|dinheiro|desculpa|fiz|meu|minha|estou|também|até|então|paguei|enviei)\b/gi,
+      es: /\b(usted|gracias|dinero|ya|mi|estoy|también|hasta|entonces|pagué|envié|hola|igual|sólo|solo)\b/gi,
+      en: /\b(the|payment|please|money|already|thanks|sent|my|will|have|and|with|from|this|that)\b/gi,
+      fr: /\b(je|vous|merci|argent|déjà|mon|suis|aussi|alors|payé|envoyé|bonjour)\b/gi
+    };
+
+    function detect(text) {
+      if (!text || text.trim().length < 12) return { lang: DEFAULT, confidence: 0, reason: "too little text" };
+      var scores = {};
+      Object.keys(MARKERS).forEach(function (l) {
+        var m = text.match(MARKERS[l]);
+        scores[l] = m ? m.length : 0;
+      });
+      var ranked = Object.keys(scores).sort(function (a, b) { return scores[b] - scores[a]; });
+      var best = ranked[0], runnerUp = ranked[1];
+      if (!scores[best]) return { lang: DEFAULT, confidence: 0, reason: "no markers" };
+
+      /* Confidence is measured against the nearest rival, not against the
+         total. What matters is whether the winner is clearly ahead of the
+         next candidate — summing across all four languages punishes a
+         confident answer just because other lists also scored something. */
+      var confidence = scores[best] / (scores[best] + scores[runnerUp]);
+      if (confidence < THRESHOLD) {
+        return { lang: DEFAULT, confidence: confidence, reason: "ambiguous vs " + runnerUp + ", defaulted" };
+      }
+      return { lang: best, confidence: confidence, reason: "detected" };
+    }
+
+    return {
+      DEFAULT: DEFAULT,
+      THRESHOLD: THRESHOLD,
+
+      /* Resolve one party's language from only that party's messages. */
+      forParty: function (messages, who, cacheKey) {
+        var key = cacheKey ? cacheKey + ":" + who : null;
+        if (key && cache[key] && Date.now() - cache[key].at < CACHE_MS) return cache[key].value;
+        var text = (messages || [])
+          .filter(function (m) { return m.from === who; })
+          .map(function (m) { return m.text; })
+          .join(" ");
+        var result = detect(text);
+        if (key) cache[key] = { at: Date.now(), value: result };
+        return result;
+      },
+
+      /* Pluggable. The demo ships a tiny phrasebook; a real deployment
+         swaps in a translation service without any caller changing. */
+      translator: null,
+
+      translate: function (text, target) {
+        if (target === DEFAULT || !PL.lang.translator) return Promise.resolve(text);
+        return Promise.resolve(PL.lang.translator(text, target));
+      },
+
+      /* Emoji, arrows and status dots must survive translation intact —
+         they are structural markers in the note format, not decoration. */
+      protect: function (text) {
+        var kept = [], i = 0;
+        var masked = text.replace(/[\u2190-\u21FF\u2600-\u27BF\uFE0F\u{1F300}-\u{1FAFF}]/gu, function (m) {
+          kept.push(m); return "\u0000" + (i++) + "\u0000";
+        });
+        return {
+          masked: masked,
+          restore: function (s) {
+            return s.replace(/\u0000(\d+)\u0000/g, function (_, n) { return kept[+n]; });
+          }
+        };
+      }
+    };
+  })();
+
+  /* ================================================================
+   * marker — verification that survives concurrency.
+   *
+   * Confirming a save by counting rows or reading the newest row is wrong
+   * on any shared queue: a colleague saving on the same case at the same
+   * moment produces a false confirmation, and the script reports success
+   * for something that never persisted.
+   *
+   * Instead, every generated note carries a unique marker, and verification
+   * searches for that exact marker anywhere in the saved history. It cannot
+   * be satisfied by somebody else's write.
+   * ================================================================ */
+
+  PL.marker = {
+    make: function (prefix) {
+      return "[" + (prefix || "ref") + ":" +
+        Date.now().toString(36) + Math.random().toString(36).slice(2, 6) + "]";
+    },
+    present: function (containerSel, mark) {
+      var el = PL.dom.qs(containerSel);
+      return !!el && el.textContent.indexOf(mark) !== -1;
+    }
+  };
+
+  /* ================================================================
+   * review — the pause before the write that can't be taken back.
+   *
+   * The chain runner can verify that a save happened. It cannot verify that
+   * the saved text was *correct*, and a confidently-executed wrong note is
+   * the most expensive thing this toolkit could produce: it is authoritative,
+   * it is permanent, and the next person to read the case will believe it.
+   *
+   * So macros run their whole sequence up to the moment before saving, then
+   * stop and show the composed text for editing. The operator adjusts the
+   * free-text portion and resumes; the mechanical steps around it still cost
+   * nothing.
+   *
+   * This is the difference between automating the typing and automating the
+   * judgement. The gate is where that line is drawn, and it is on by default
+   * because the failure it prevents is silent.
+   * ================================================================ */
+
+  PL.review = {
+    enabled: true,
+
+    /* Resolves with edited text, or null if the operator abandons. */
+    gate: function (title, text, meta) {
+      if (!PL.review.enabled) return Promise.resolve(text);
+      PL.dom.style("pl-core-css", CSS);
+
+      return new Promise(function (resolve) {
+        var ta = PL.dom.el("textarea", { class: "pl-rv-t", spellcheck: "false" });
+        ta.value = text;
+
+        var box = PL.dom.el("div", { id: "pl-cf-b", style: "width:min(620px,94vw)" });
+        box.appendChild(PL.dom.el("h3", { text: title }));
+        (meta || []).forEach(function (m) {
+          box.appendChild(PL.dom.el("div", { text: m, style: "font-size:12px;color:#5b616d;margin-bottom:2px" }));
+        });
+        box.appendChild(ta);
+        box.appendChild(PL.dom.el("div", {
+          class: "pl-hint",
+          text: "Everything mechanical is done. Edit the wording, then save."
+        }));
+
+        var ft = PL.dom.el("div", { class: "ft" });
+        var ov = PL.dom.el("div", { id: "pl-cf" }, [box]);
+        function done(v) { ov.remove(); document.removeEventListener("keydown", k, true); resolve(v); }
+        function k(e) {
+          if (e.key === "Escape") { e.preventDefault(); done(null); }
+          if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); done(ta.value); }
+        }
+        ft.appendChild(PL.dom.el("button", { class: "pl-btn", text: "Abandon", onclick: function () { done(null); } }));
+        ft.appendChild(PL.dom.el("button", { class: "pl-btn on", text: "Save note (⌘↵)", onclick: function () { done(ta.value); } }));
+        box.appendChild(ft);
+
+        document.addEventListener("keydown", k, true);
+        document.body.appendChild(ov);
+        ta.focus();
+        ta.setSelectionRange(ta.value.length, ta.value.length);
       });
     }
   };
 
-  /* ------------------------------------------------------------------ *
-   * clipboard
-   * ------------------------------------------------------------------ */
+  /* ================================================================
+   * guard — refuse to bind twice.
+   *
+   * Two installed copies of the same script bind two listeners, and every
+   * macro fires twice. Four copies, four times. The symptom looks like the
+   * host misbehaving rather than a packaging problem, so it costs hours to
+   * diagnose the first time.
+   *
+   * The usual cause is a filename that no longer matches @name: the extension
+   * matches on @name when reinstalling, so a mismatch adds a second copy
+   * instead of replacing the first.
+   * ================================================================ */
+
+  PL.guard = function (id) {
+    var key = "__PL_BOUND_" + id + "__";
+    if (global[key]) {
+      PL.log("guard", id + " already bound — this copy is standing down");
+      return false;
+    }
+    global[key] = true;
+    return true;
+  };
+
+  /* Exposed so a human can check for stale installs from the console. */
+  PL.instances = global.__PL_INSTANCES__ = global.__PL_INSTANCES__ || {};
+  PL.register = function (id, version) {
+    (PL.instances[id] = PL.instances[id] || []).push(version);
+    if (PL.instances[id].length > 1) {
+      PL.log("guard", "multiple versions of " + id + ": " + PL.instances[id].join(", "));
+    }
+  };
+
+  /* ================================================================
+   * requireCore — fail loudly on a load-order mistake.
+   *
+   * Dependent scripts must not silently degrade when the core hasn't loaded.
+   * A language-aware macro that quietly falls back to English because the
+   * core wasn't ready sends real messages to real users in the wrong language
+   * and nobody notices for weeks. Refusing to run is the correct behaviour.
+   *
+   * The extension executes in list order, so this is a real hazard, not a
+   * theoretical one.
+   * ================================================================ */
+
+  PL.requireCore = function (minVersion) {
+    var have = PL.version.split(".").map(Number);
+    var need = String(minVersion).split(".").map(Number);
+    for (var i = 0; i < need.length; i++) {
+      if ((have[i] || 0) > (need[i] || 0)) return true;
+      if ((have[i] || 0) < (need[i] || 0)) {
+        throw new Error(
+          "pl-core " + minVersion + " or newer required, found " + PL.version +
+          ". Move the core above this script in the extension list, or update it."
+        );
+      }
+    }
+    return true;
+  };
+
+  /* ================================================================
+   * registry + bus — scripts publish, the launcher renders.
+   *
+   * The alternative is a launcher that imports every macro, which means
+   * adding a macro edits two files and the launcher becomes a merge
+   * conflict magnet. Here a script pushes its entries and the launcher
+   * renders whatever it finds; adding a macro touches one file.
+   *
+   * Entries de-duplicate on channel + id, which is what stops a duplicate
+   * install from producing double entries in the palette.
+   * ================================================================ */
+
+  PL.registry = (function () {
+    var entries = global.__PL_REGISTRY__ = global.__PL_REGISTRY__ || [];
+
+    return {
+      publish: function (entry) {
+        var dup = entries.some(function (e) {
+          return e.channel === entry.channel && e.id === entry.id;
+        });
+        if (dup) { PL.log("registry", "duplicate ignored: " + entry.channel + "/" + entry.id); return false; }
+        entries.push(entry);
+        return true;
+      },
+      all: function () {
+        return entries.slice().sort(function (a, b) {
+          return (a.order || 100) - (b.order || 100);
+        });
+      },
+      group: function (name) {
+        return PL.registry.all().filter(function (e) { return e.group === name; });
+      },
+      count: function () { return entries.length; }
+    };
+  })();
+
+  /* The channel/id pair is a frozen vocabulary: other scripts key behaviour
+     off these strings, so renaming one silently breaks a listener elsewhere.
+     Treat them as an API, not as labels. */
+  PL.bus = {
+    emit: function (channel, id, payload) {
+      document.dispatchEvent(new CustomEvent("pl:" + channel, {
+        detail: { id: id, payload: payload || null }
+      }));
+    },
+    on: function (channel, fn) {
+      document.addEventListener("pl:" + channel, function (e) {
+        fn(e.detail.id, e.detail.payload);
+      });
+    }
+  };
+
+  /* ================================================================
+   * exclusive — one long-running loop at a time.
+   *
+   * Two watchers polling the same queue fight each other and double the
+   * request rate for no benefit. Rather than coordinating, each announces
+   * itself on start and the others stand down.
+   *
+   * No shared state, no lock service, no server — which matters, because a
+   * browser userscript has none of those available.
+   * ================================================================ */
+
+  PL.exclusive = (function () {
+    var stoppers = {};
+    document.addEventListener("pl:exclusive-start", function (e) {
+      Object.keys(stoppers).forEach(function (name) {
+        if (name !== e.detail.name) {
+          PL.log("exclusive", name + " standing down for " + e.detail.name);
+          stoppers[name]("another loop started");
+        }
+      });
+    });
+    return {
+      claim: function (name, stopFn) {
+        stoppers[name] = stopFn;
+        document.dispatchEvent(new CustomEvent("pl:exclusive-start", { detail: { name: name } }));
+      },
+      release: function (name) { delete stoppers[name]; }
+    };
+  })();
+
+  /* ================================================================
+   * abort — a stop signal that cannot become an alert.
+   *
+   * When the operator cancels at a review gate, the chain must unwind
+   * silently. But generic error handling further up (`catch (e) { alert(
+   * e.message) }`) will happily surface a cancellation as a scary dialog.
+   *
+   * Reading .message or stringifying this object re-throws it, so any
+   * handler that tries to display it propagates instead. Blunt, and it
+   * works across sandbox realms where patching window.alert does not.
+   * ================================================================ */
+
+  PL.abort = function (reason) {
+    var stop = { __plAbort: true, reason: reason || "aborted" };
+    Object.defineProperty(stop, "message", { get: function () { throw stop; } });
+    stop.toString = function () { throw stop; };
+    return stop;
+  };
+
+  PL.isAbort = function (e) { return !!(e && e.__plAbort); };
+
+  /* ================================================================
+   * ui — one docked panel, shared sections.
+   * ================================================================ */
+
+  var CSS = [
+    "#pl-panel{position:fixed;top:0;right:0;width:330px;height:100vh;background:#fff;border-left:1px solid #dcdfe4;",
+    "box-shadow:-2px 0 14px rgba(0,0,0,.07);z-index:9000;display:flex;flex-direction:column;",
+    "font:13px/1.45 system-ui,-apple-system,sans-serif;color:#1b1d22}",
+    "#pl-panel.pl-min{transform:translateX(calc(100% - 30px))}",
+    "#pl-head{display:flex;align-items:center;gap:8px;padding:8px 11px;background:#1b1d22;color:#fff;flex:0 0 auto}",
+    "#pl-head b{font-size:11px;letter-spacing:.07em;text-transform:uppercase;font-weight:650}",
+    "#pl-head .sp{flex:1}#pl-head button{background:none;border:0;color:#fff;cursor:pointer;font-size:15px;padding:0 3px}",
+    "#pl-body{overflow-y:auto;flex:1;min-height:0}",
+    ".pl-sec{border-bottom:1px solid #eaecef;padding:11px 13px}",
+    ".pl-sec h4{margin:0 0 8px;font-size:10px;letter-spacing:.07em;text-transform:uppercase;color:#5b616d;font-weight:650;display:flex}",
+    ".pl-sec h4 .r{margin-left:auto;text-transform:none;letter-spacing:0;color:#8d939e;font-weight:400}",
+    ".pl-row{display:flex;justify-content:space-between;gap:9px;padding:2px 0;font-size:12px}",
+    ".pl-row .k{color:#8d939e}.pl-row .v{font-family:ui-monospace,Menlo,monospace;text-align:right}",
+    ".pl-sub{margin:11px 0 6px;font-size:10px;letter-spacing:.07em;text-transform:uppercase;color:#5b616d;font-weight:650}",
+    ".pl-flag{border-left:3px solid #8a5a10;background:#fcf3e2;padding:6px 8px;margin-bottom:6px;cursor:pointer}",
+    ".pl-flag .t{font-weight:650;font-size:11.5px;color:#8a5a10}",
+    ".pl-flag .q{font-size:11.5px;color:#5b616d;margin-top:2px;font-style:italic}",
+    ".pl-flag .w{font-size:11px;color:#8d939e;margin-top:3px}",
+    ".pl-none{color:#8d939e;font-size:12px}",
+    ".pl-btn{font:inherit;font-size:12px;padding:5px 9px;border:1px solid #dcdfe4;background:#fff;border-radius:2px;cursor:pointer;margin:0 5px 5px 0}",
+    ".pl-btn:hover{border-color:#8d939e}.pl-btn.on{background:#1f4d5c;border-color:#1f4d5c;color:#fff}",
+    ".pl-out{width:100%;min-height:130px;font:11.5px/1.5 ui-monospace,Menlo,monospace;border:1px solid #dcdfe4;padding:7px;resize:vertical;margin-top:7px}",
+    ".pl-hint{font-size:11px;color:#8d939e;margin-top:5px}",
+    ".pl-quote{font-size:11.5px;color:#5b616d;border-left:2px solid #dcdfe4;padding-left:7px;margin:3px 0}",
+    ".pl-dot{width:7px;height:7px;border-radius:50%;display:inline-block;margin-right:5px}",
+    ".pl-dot.on{background:#1d6949}.pl-dot.off{background:#8d939e}",
+    /* overlay */
+    "#pl-ov{position:fixed;inset:0;background:rgba(15,17,20,.42);z-index:9500;display:flex;align-items:flex-start;justify-content:center;padding-top:11vh}",
+    "#pl-ov-box{background:#fff;width:min(620px,92vw);border-radius:3px;box-shadow:0 18px 50px rgba(0,0,0,.3);overflow:hidden;",
+    "font:13px/1.45 system-ui,-apple-system,sans-serif}",
+    "#pl-ov-in{width:100%;border:0;border-bottom:1px solid #dcdfe4;padding:13px 15px;font:15px system-ui;outline:none}",
+    "#pl-ov-list{max-height:52vh;overflow-y:auto}",
+    ".pl-ov-i{padding:9px 15px;border-bottom:1px solid #eaecef;cursor:pointer;display:flex;gap:10px;align-items:baseline}",
+    ".pl-ov-i.sel{background:#e8f0f2}",
+    ".pl-ov-i .nm{font-weight:600;font-size:12.5px}",
+    ".pl-ov-i .tags{margin-left:auto;font-size:10.5px;color:#8d939e;font-family:ui-monospace,Menlo,monospace}",
+    ".pl-ov-i .pv{font-size:11.5px;color:#5b616d;margin-top:2px;display:block;width:100%}",
+    "#pl-ov-foot{padding:8px 15px;font-size:11px;color:#8d939e;background:#f8f9fa;display:flex;gap:14px}",
+    ".pl-step{display:flex;gap:7px;align-items:baseline;font-size:11.5px;padding:2px 0}",
+    ".pl-step .ic{width:13px;text-align:center;font-family:ui-monospace,Menlo,monospace}",
+    ".pl-step.done .ic{color:#1d6949}.pl-step.failed .ic{color:#8f2f2c}",
+    ".pl-step.running .ic{color:#8a5a10}.pl-step.pending{color:#8d939e}",
+    ".pl-step.declined .ic{color:#8d939e}",
+    ".pl-warn{border-left:3px solid #8f2f2c;background:#fbecea;padding:6px 8px;margin-top:7px;font-size:11.5px;color:#8f2f2c}",
+    ".pl-okbox{border-left:3px solid #1d6949;background:#e7f2ed;padding:6px 8px;margin-top:7px;font-size:11.5px;color:#1d6949}",
+    ".pl-pre{border-left:3px solid #8a5a10;background:#fcf3e2;padding:6px 8px;margin-top:7px;font-size:11.5px;color:#8a5a10}",
+    "#pl-cf{position:fixed;inset:0;background:rgba(15,17,20,.45);z-index:9700;display:flex;align-items:center;justify-content:center}",
+    "#pl-cf-b{background:#fff;width:min(460px,92vw);border-radius:3px;padding:18px;font:13px/1.5 system-ui,-apple-system,sans-serif;box-shadow:0 18px 50px rgba(0,0,0,.3)}",
+    "#pl-cf-b h3{margin:0 0 8px;font-size:14px}",
+    "#pl-cf-b .ft{margin-top:14px;display:flex;gap:7px;justify-content:flex-end}",
+    ".pl-rv-t{width:100%;min-height:190px;font:12px/1.55 ui-monospace,Menlo,monospace;border:1px solid #dcdfe4;padding:9px;margin-top:10px;resize:vertical}",
+    ".pl-lang{display:inline-block;font-size:10px;font-family:ui-monospace,Menlo,monospace;background:#e8f0f2;color:#1f4d5c;padding:1px 5px;border-radius:2px;margin-left:5px}",
+    ".pl-lang.low{background:#fcf3e2;color:#8a5a10}",
+    ".pl-matrix{font-size:11px;color:#8d939e;font-family:ui-monospace,Menlo,monospace;margin-top:5px}",
+    /* toast */
+    "#pl-toasts{position:fixed;left:14px;bottom:14px;z-index:9600;display:flex;flex-direction:column;gap:6px}",
+    ".pl-toast{background:#1f4d5c;color:#fff;padding:7px 12px;border-radius:2px;font:12.5px system-ui;max-width:320px}"
+  ].join("");
+
+  PL.ui = {
+    _sec: {},
+    panel: function () {
+      var p = document.getElementById("pl-panel");
+      if (p) return p;
+      PL.dom.style("pl-core-css", CSS);
+      p = PL.dom.el("div", { id: "pl-panel" });
+      p.appendChild(PL.dom.el("div", { id: "pl-head" }, [
+        PL.dom.el("b", { text: "Toolkit" }),
+        PL.dom.el("span", { class: "sp" }),
+        PL.dom.el("button", { title: "Collapse (Alt+\\)", text: "\u203a", onclick: function () { p.classList.toggle("pl-min"); } })
+      ]));
+      p.appendChild(PL.dom.el("div", { id: "pl-body" }));
+      document.body.appendChild(p);
+      PL.hotkeys.bind("alt+\\", function () { p.classList.toggle("pl-min"); });
+      return p;
+    },
+    section: function (key, title) {
+      PL.ui.panel();
+      if (PL.ui._sec[key]) return PL.ui._sec[key];
+      var body = PL.dom.el("div");
+      var h = PL.dom.el("h4", { text: title });
+      var right = PL.dom.el("span", { class: "r" });
+      h.appendChild(right);
+      var sec = PL.dom.el("div", { class: "pl-sec", "data-pl-section": key }, [h, body]);
+      document.getElementById("pl-body").appendChild(sec);
+      body.setHeaderRight = function (t) { right.textContent = t; };
+      PL.ui._sec[key] = body;
+      return body;
+    },
+    rows: function (pairs) {
+      return pairs.map(function (p) {
+        return PL.dom.el("div", { class: "pl-row" }, [
+          PL.dom.el("span", { class: "k", text: p[0] }),
+          PL.dom.el("span", { class: "v", text: p[1] })
+        ]);
+      });
+    },
+    sub: function (t) { return PL.dom.el("div", { class: "pl-sub", text: t }); },
+    clear: function (n) { while (n.firstChild) n.removeChild(n.firstChild); },
+
+    /* Blocking yes/no for irreversible steps. Deliberately not window.confirm:
+       the point is to show the operator what has already committed before
+       they authorise something that cannot be taken back. */
+    confirm: function (title, lines) {
+      PL.dom.style("pl-core-css", CSS);
+      return new Promise(function (resolve) {
+        var box = PL.dom.el("div", { id: "pl-cf-b" });
+        box.appendChild(PL.dom.el("h3", { text: title }));
+        (lines || []).forEach(function (l) {
+          box.appendChild(PL.dom.el("div", { text: l, style: "font-size:12.5px;color:#5b616d;margin-bottom:3px" }));
+        });
+        var ft = PL.dom.el("div", { class: "ft" });
+        var ov = PL.dom.el("div", { id: "pl-cf" }, [box]);
+        function done(v) { ov.remove(); document.removeEventListener("keydown", k, true); resolve(v); }
+        function k(e) {
+          if (e.key === "Escape") { e.preventDefault(); done(false); }
+          if (e.key === "Enter") { e.preventDefault(); done(true); }
+        }
+        ft.appendChild(PL.dom.el("button", { class: "pl-btn", text: "Cancel", onclick: function () { done(false); } }));
+        ft.appendChild(PL.dom.el("button", { class: "pl-btn on", text: "Confirm", onclick: function () { done(true); } }));
+        box.appendChild(ft);
+        document.addEventListener("keydown", k, true);
+        document.body.appendChild(ov);
+      });
+    },
+    toast: function (t) {
+      PL.dom.style("pl-core-css", CSS);
+      var stack = document.getElementById("pl-toasts");
+      if (!stack) { stack = PL.dom.el("div", { id: "pl-toasts" }); document.body.appendChild(stack); }
+      var el = PL.dom.el("div", { class: "pl-toast", text: t });
+      stack.appendChild(el);
+      setTimeout(function () { el.remove(); }, 3200);
+    }
+  };
+
+  /* ================================================================
+   * overlay — keyboard-first filter list.
+   *
+   * Items: { name, preview, tags:[], run:fn }
+   * ================================================================ */
+
+  PL.overlay = function (opts) {
+    var items = opts.items || [];
+    var placeholder = opts.placeholder || "Search";
+    var footer = opts.footer || "";
+    var sel = 0, filtered = items.slice();
+
+    PL.dom.style("pl-core-css", CSS);
+
+    var input = PL.dom.el("input", { id: "pl-ov-in", placeholder: placeholder, autocomplete: "off", spellcheck: "false" });
+    var list = PL.dom.el("div", { id: "pl-ov-list" });
+    var box = PL.dom.el("div", { id: "pl-ov-box" }, [
+      input, list, PL.dom.el("div", { id: "pl-ov-foot" }, [
+        PL.dom.el("span", { text: "\u2191\u2193 move" }),
+        PL.dom.el("span", { text: "\u21b5 insert" }),
+        PL.dom.el("span", { text: "esc close" }),
+        PL.dom.el("span", { text: footer })
+      ])
+    ]);
+    var ov = PL.dom.el("div", { id: "pl-ov" }, [box]);
+
+    function score(item, q) {
+      if (!q) return 0;
+      var hay = (item.name + " " + (item.tags || []).join(" ")).toLowerCase();
+      var qi = 0;
+      for (var i = 0; i < hay.length && qi < q.length; i++) if (hay[i] === q[qi]) qi++;
+      return qi === q.length ? hay.indexOf(q) === -1 ? 2 : 1 : -1;
+    }
+
+    function draw() {
+      list.innerHTML = "";
+      if (!filtered.length) {
+        list.appendChild(PL.dom.el("div", { class: "pl-ov-i", html: '<span class="pv">No match.</span>' }));
+        return;
+      }
+      filtered.forEach(function (it, i) {
+        var row = PL.dom.el("div", { class: "pl-ov-i" + (i === sel ? " sel" : "") }, [
+          PL.dom.el("span", { class: "nm", text: it.name }),
+          PL.dom.el("span", { class: "tags", text: (it.tags || []).join(" ") }),
+          PL.dom.el("span", { class: "pv", text: it.preview || "" })
+        ]);
+        row.addEventListener("click", function () { choose(i); });
+        list.appendChild(row);
+      });
+      var s = list.children[sel];
+      if (s && s.scrollIntoView) s.scrollIntoView({ block: "nearest" });
+    }
+
+    function filter() {
+      var q = input.value.trim().toLowerCase();
+      filtered = !q ? items.slice() : items
+        .map(function (it) { return { it: it, s: score(it, q) }; })
+        .filter(function (x) { return x.s >= 0; })
+        .sort(function (a, b) { return a.s - b.s; })
+        .map(function (x) { return x.it; });
+      sel = 0;
+      draw();
+    }
+
+    function close() { ov.remove(); document.removeEventListener("keydown", key, true); }
+    function choose(i) { var it = filtered[i]; close(); if (it && it.run) it.run(); }
+
+    function key(e) {
+      if (e.key === "Escape") { e.preventDefault(); close(); }
+      else if (e.key === "ArrowDown") { e.preventDefault(); sel = Math.min(sel + 1, filtered.length - 1); draw(); }
+      else if (e.key === "ArrowUp") { e.preventDefault(); sel = Math.max(sel - 1, 0); draw(); }
+      else if (e.key === "Enter") { e.preventDefault(); choose(sel); }
+    }
+
+    input.addEventListener("input", filter);
+    document.addEventListener("keydown", key, true);
+    ov.addEventListener("mousedown", function (e) { if (e.target === ov) close(); });
+
+    document.body.appendChild(ov);
+    input.focus();
+    draw();
+    return { close: close };
+  };
+
+  /* ================================================================
+   * hotkeys — one listener for the whole toolkit.
+   * ================================================================ */
+
+  PL.hotkeys = (function () {
+    var map = {}, attached = false;
+    function norm(e) {
+      var p = [];
+      if (e.altKey) p.push("alt");
+      if (e.ctrlKey) p.push("ctrl");
+      if (e.metaKey) p.push("meta");
+      if (e.shiftKey) p.push("shift");
+      p.push(String(e.key).toLowerCase());
+      return p.join("+");
+    }
+    function attach() {
+      if (attached) return;
+      attached = true;
+      document.addEventListener("keydown", function (e) {
+        var t = (e.target.tagName || "").toLowerCase();
+        var typing = t === "input" || t === "textarea" || e.target.isContentEditable;
+        var combo = norm(e);
+        var fn = map[combo];
+        if (!fn) return;
+        // Modifier-bearing shortcuts still work while typing; bare keys do not.
+        if (typing && !(e.altKey || e.ctrlKey || e.metaKey)) return;
+        e.preventDefault();
+        fn(e);
+      }, true);
+    }
+    return {
+      bind: function (c, fn) { map[c.toLowerCase()] = fn; attach(); },
+      list: function () { return Object.keys(map); }
+    };
+  })();
+
+  /* ================================================================
+   * template — strict tokens, loud failure.
+   *
+   * An unresolved token throws rather than rendering "Dear {{name}}" into
+   * a message an operator then sends to a real person.
+   * ================================================================ */
+
+  PL.template = {
+    render: function (tpl, vars) {
+      return tpl.replace(/\{\{(\w+)\}\}/g, function (_, k) {
+        if (!(k in vars) || vars[k] === undefined || vars[k] === null || vars[k] === "") {
+          throw new Error("missing token: " + k);
+        }
+        return vars[k];
+      });
+    },
+    tokens: function (tpl) {
+      var out = [], m, re = /\{\{(\w+)\}\}/g;
+      while ((m = re.exec(tpl))) if (out.indexOf(m[1]) === -1) out.push(m[1]);
+      return out;
+    }
+  };
+
+  /* ================================================================
+   * insert — write into a host textarea without breaking its framework.
+   * ================================================================ */
+
+  PL.insert = function (field, text, mode) {
+    if (!field) return false;
+    var setter = Object.getOwnPropertyDescriptor(
+      Object.getPrototypeOf(field), "value"
+    );
+    var next = mode === "append" && field.value.trim() ? field.value.replace(/\s*$/, "") + "\n\n" + text : text;
+    if (setter && setter.set) setter.set.call(field, next);
+    else field.value = next;
+    field.dispatchEvent(new Event("input", { bubbles: true }));
+    field.dispatchEvent(new Event("change", { bubbles: true }));
+    field.focus();
+    return true;
+  };
 
   PL.clipboard = {
-    copy: function (text) {
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        return navigator.clipboard.writeText(text);
-      }
+    copy: function (t) {
+      if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(t);
       var ta = document.createElement("textarea");
-      ta.value = text;
-      document.body.appendChild(ta);
-      ta.select();
-      document.execCommand("copy");
-      ta.remove();
+      ta.value = t; document.body.appendChild(ta); ta.select();
+      document.execCommand("copy"); ta.remove();
       return Promise.resolve();
     }
   };
 
-  /* ------------------------------------------------------------------ *
-   * log
-   * ------------------------------------------------------------------ */
+  PL.log = function (s, m) { if (global.PL_DEBUG) console.log("[pl:" + s + "] " + m); };
 
-  PL.log = function (script, msg) {
-    if (global.PL_DEBUG) console.log("[pl:" + script + "] " + msg);
-  };
-
-  PL.version = "1.0.0";
   global.PL = PL;
 })(typeof unsafeWindow !== "undefined" ? unsafeWindow : window);

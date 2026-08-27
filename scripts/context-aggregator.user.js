@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         PeerLedger — Context Aggregator
 // @namespace    https://github.com/cvidal22
-// @version      1.0.0
-// @description  Collapses order, counterparty and claim context into one always-visible brief, removing the tab round-trip from every dispute review.
+// @version      3.0.0
+// @description  Collapses order state, counterparty asymmetry and evidence inventory into one always-visible brief, so the decision starts from a single view.
 // @author       cvidal22
 // @match        https://cvidal22.github.io/peerledger-workflow-toolkit/*
 // @require      https://cdn.jsdelivr.net/gh/cvidal22/peerledger-workflow-toolkit@main/core/pl-core.js
@@ -13,98 +13,91 @@
 /*
  * THE PROBLEM
  *
- * The console splits a single decision across four tabs. Reviewing one dispute
- * means: read the claim, switch to order details to check status and value,
- * switch to the chat to see what was agreed, switch back to the claim to look
- * at the evidence, then hold all of it in your head at once.
- *
- * None of that is analysis. It is retrieval, and it repeats on every case.
+ * A case page holds five boxes across two columns, and the facts that actually
+ * drive the decision are one or two lines from each of them. Reading a case
+ * means scrolling between them and assembling the picture in your head, then
+ * doing it again when you come back to the case after a follow-up.
  *
  * WHAT THIS DOES
  *
- * Reads all four tabs once when the case loads and renders a single brief:
- * the numbers that determine severity, the counterparty asymmetry that usually
- * decides credibility, and the evidence inventory.
+ * Reads the whole page once per case and renders the assembled picture: the
+ * order facts that set severity, the counterparty comparison that usually
+ * drives credibility, and what evidence is actually on file.
  *
- * WHAT IT DELIBERATELY DOES NOT DO
+ * THE ONE JUDGEMENT IT ENCODES, STATED OPENLY
  *
- * It does not summarise the claim, weight the evidence or suggest an outcome.
- * Every value shown is a value that already exists on the page. If the operator
- * would have to trust the script's reading of something, the script does not
- * show it.
+ * It puts complainant and defendant side by side. That is a claim about what
+ * matters — that relative account history is worth looking at early — and it
+ * is the only opinion in the script. Everything else is verbatim.
+ *
+ * WHAT IT DOES NOT DO
+ *
+ * No summary of the narrative, no evidence weighting, no suggested outcome.
+ * Every value shown appears somewhere on the page already. If the operator
+ * would have to trust the script's *reading* of something rather than check
+ * it in one glance, it isn't here.
  */
 
 (function () {
   "use strict";
 
-  function riskSpread(c) {
-    // Not a score. A plain statement of how differently the two accounts look,
-    // which is exactly what an operator eyeballs first and what the tab layout
-    // makes annoying to compare.
-    var s = c.parties.seller, b = c.parties.buyer;
-    return {
-      ordersGap: s.orders + " vs " + b.orders,
-      disputesGap: s.disputes + " vs " + b.disputes,
-      tenureGap: s.tenure + " vs " + b.tenure
-    };
-  }
+  if (!PL.guard("context-aggregator")) return;
+  PL.requireCore("3.0.0");
+  PL.register("context-aggregator", "3.0.0");
 
-  function render(body, c) {
+  var body = PL.ui.section("aggregator", "Case brief");
+
+  function render(c) {
     PL.ui.clear(body);
-    var spread = riskSpread(c);
+    if (!c) {
+      body.appendChild(PL.dom.el("div", { class: "pl-none", text: "Open a case." }));
+      return;
+    }
+
+    body.setHeaderRight(c.id);
 
     PL.ui.rows([
-      ["Claim", c.id],
       ["Type", c.typeLabel],
       ["Filed by", c.filedBy],
-      ["Order status", c.order.status],
-      ["Value", c.order.fiatValue],
-      ["Asset", c.order.asset],
+      ["Order", c.order.status],
+      ["Value", c.order.fiat],
+      ["Crypto", c.order.crypto],
       ["Method", c.order.method],
-      ["Released", c.order.releasedAt]
+      ["Released", c.order.releasedAt || "-"],
+      ["SLA", c.sla]
     ]).forEach(function (r) { body.appendChild(r); });
 
-    body.appendChild(PL.dom.el("h4", {
-      text: "Seller vs buyer",
-      style: "margin:12px 0 7px;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:#545a66;font-weight:650"
-    }));
-
+    body.appendChild(PL.ui.sub("Complainant vs defendant"));
     PL.ui.rows([
-      ["Completed orders", spread.ordersGap],
-      ["Prior disputes", spread.disputesGap],
-      ["Account tenure", spread.tenureGap]
+      ["Handle", c.complainant.handle + " / " + c.defendant.handle],
+      ["Role", c.complainant.role + " / " + c.defendant.role],
+      ["Tier", c.complainant.tier + " / " + c.defendant.tier],
+      ["Account age", c.complainant.tenure + " / " + c.defendant.tenure],
+      ["Orders", c.complainant.orders + " / " + c.defendant.orders],
+      ["Prior disputes", c.complainant.disputes + " / " + c.defendant.disputes]
     ]).forEach(function (r) { body.appendChild(r); });
 
-    body.appendChild(PL.dom.el("h4", {
-      text: "Evidence on file (" + c.evidence.length + ")",
-      style: "margin:12px 0 7px;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:#545a66;font-weight:650"
-    }));
-
+    body.appendChild(PL.ui.sub("Evidence (" + c.evidence.length + ")"));
     if (!c.evidence.length) {
       body.appendChild(PL.dom.el("div", { class: "pl-none", text: "Nothing submitted." }));
     } else {
       c.evidence.forEach(function (e) {
-        body.appendChild(PL.dom.el("div", { class: "pl-quote", text: e.kind + " · " + e.label }));
+        body.appendChild(PL.dom.el("div", { class: "pl-quote", text: e.tag + " · " + e.label }));
       });
     }
 
     body.appendChild(PL.dom.el("div", {
       class: "pl-hint",
-      text: "Chat: " + c.chat.length + " messages. Alt+1 jumps to the transcript."
+      text: c.chat.length + " chat messages. Alt+2 scrolls to the transcript."
     }));
 
     PL.log("aggregator", "rendered " + c.id);
   }
 
-  var body = PL.ui.section("aggregator", "Case brief");
-
-  PL.hotkeys.bind("alt+1", function () {
-    var tab = PL.dom.qs('.tab[data-panel="chat"]');
-    if (tab) tab.click();
+  PL.hotkeys.bind("alt+2", function () {
+    var el = PL.dom.qs("#chat-log");
+    if (el) el.scrollIntoView({ block: "center", behavior: "smooth" });
   });
 
-  PL.watch(PL.adapter.caseKey, function () {
-    var c = PL.adapter.readCase();
-    if (c) render(body, c);
-  });
+  PL.watch(PL.adapter.caseKey, function () { render(PL.adapter.readCase()); });
 })();

@@ -1,0 +1,12 @@
+{
+  "name": "peerledger-workflow-toolkit",
+  "version": "3.0.0",
+  "private": true,
+  "description": "Userscript toolkit demonstrating operational workflow automation against a fictional dispute console.",
+  "scripts": {
+    "validate": "node build/validate.js",
+    "test": "node build/validate.js && node tests/toolkit.test.js && node tests/chain.test.js && node tests/matrix.test.js"
+  },
+  "devDependencies": { "jsdom": "^24.0.0" },
+  "license": "MIT"
+}

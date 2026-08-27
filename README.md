@@ -2,9 +2,11 @@
 
 **A worked example of decomposing an operational workflow into what a human must decide and what a machine should have already done.**
 
-Three browser userscripts on a shared core, running against a fictional peer-to-peer dispute console. Live and installable in about two minutes.
+Seven browser userscripts on a shared core, running against a fictional peer-to-peer dispute console. Live and installable in about two minutes.
 
-**[→ Open the demo console](https://cvidal22.github.io/peerledger-workflow-toolkit/)**
+**[→ Open the demo console](https://cvidal22.github.io/peerledger-workflow-toolkit/)**  ·  **[→ Engineering notes](ENGINEERING-NOTES.md)**  ·  **[→ Architecture](guide/ARCHITECTURE.md)**  ·  **[→ DOM cookbook](guide/dom-cookbook.md)**
+
+*If you only read one thing here, read the [engineering notes](ENGINEERING-NOTES.md). The scripts demonstrate; that document explains what was learned building the real thing.*
 
 ---
 
@@ -12,9 +14,9 @@ Three browser userscripts on a shared core, running against a fictional peer-to-
 
 I spend my working day inside a dispute queue: two counterparties, one failed trade, conflicting accounts of what happened, and a decision that has to be defensible.
 
-The decision is the job. Everything wrapped around it mostly isn't — retrieving context that the interface split across four tabs, re-reading a transcript for the same handful of policy markers, and retyping the same order reference into a user message and then again into an internal note.
+The decision is the job. Almost everything wrapped around it isn't — waiting on a queue to hand you the next case, retrieving context the interface split across five panels, re-reading a transcript for the same handful of policy markers, and retyping the same order reference into a user message and then again into an internal note.
 
-So I started separating the two, measuring what the second category actually cost, and building against it. This repository is that method, rebuilt from scratch against an invented platform so it can be shown publicly.
+So I started separating the two, measuring what the second category actually cost, and building against it. Around seventy scripts later, this repository is that method — rebuilt from scratch against an invented platform so it can be shown publicly.
 
 > **On the source material:** every line here was written for this repository. No employer code, terminology, interface structure or process logic appears in it. The demo platform, its data and its rules are fictional. What is being shown is an approach, not an artefact.
 
@@ -26,105 +28,219 @@ Working through one dispute end to end:
 
 | Step | Nature | Handled by |
 |---|---|---|
+| Wait for the queue to release the next case | Mechanical, and *dead attention* | **Script** |
 | Retrieve order state, counterparty history, claim, transcript, evidence | Mechanical retrieval | **Script** |
 | Read the transcript for policy-violation markers | Mechanical scanning, **fatigue-sensitive** | **Script surfaces, human reads** |
 | Weigh conflicting evidence between two parties | Judgement | **Human, always** |
-| Decide whether evidence is sufficient | Judgement | **Human, always** |
+| Decide whether the evidence is sufficient | Judgement | **Human, always** |
 | Choose the resolution route | Judgement | **Human, always** |
 | Write the user message and the internal case note | Mechanical composition | **Script** |
+| Send it, record it, close the claim — in order, all or nothing | Mechanical, **and partially-failable** | **Script** |
 
 The middle rows never move. The outer rows should never have been manual.
 
-**Aggregate → surface → compose.** Three scripts, in that order.
+**Claim → aggregate → surface → decide → compose → commit.** The scripts occupy every step except the one in the middle.
 
 ---
 
 ## The scripts
 
-### 1. Context Aggregator
-The console splits one decision across four tabs. This reads all of them on case load and renders a single brief: the values that set severity, the seller-versus-buyer asymmetry that usually drives credibility, and the evidence inventory.
+### 1. Queue Auto-Claim
+Polls the unassigned pool, claims the oldest waiting case, and stops.
 
-It shows no value that isn't already on the page. It does not summarise the claim — if the operator would have to trust the script's *reading* of something, it isn't shown.
+Writing "click the button every five seconds" takes two minutes. What separates that from something you can leave running for a shift is: **backoff** (an empty pool is polled progressively less often, 5s → 60s), **a hard stop** (after a run of empty cycles it stops rather than hammering all night from a forgotten tab), **one at a time** (it claims a single case and disarms, so it can't build you a private backlog your colleagues can't see), and **no overlap** (a cycle can't start while the previous one is in flight).
 
-### 2. Signal Surfacer
-Runs a pattern set over the transcript and claim statement, flagging off-platform contact solicitation, third-party payment indicators, release pressure, unverified bank-delay claims, and re-trade requests. Each flag shows the line it matched and who said it, and clicking it jumps to the source.
+All four live in `PL.poll`, so the next polling script inherits them. That's the actual payoff of a shared core — the second script is where the first one's scar tissue stops being rework.
 
-**It has no verdict.** It cannot escalate, score, or recommend. It answers exactly one question — *is there a line here you would want to have read?* — and hands the line back.
+It doesn't cherry-pick. It takes the oldest waiting item, the same one you'd have taken, because a script that picks the easy cases quietly reshapes what the rest of the team is left holding.
 
-That limit is deliberate and it is the most important design decision in the repository. An operator shown a conclusion starts agreeing with it, and a pattern matcher has no idea what it's missing. So the script optimises for recall, accepts false positives as the cost, and leaves precision where it belongs. Patterns catch attention; they don't spend it.
+### 2. Context Aggregator
+Reads all five panels on case load and renders one brief: the order facts that set severity, the counterparty comparison that usually drives credibility, and the evidence inventory.
 
-### 3. Resolution Composer
-After the operator has chosen a route, fills that route's templates from live case data and produces both artefacts — the user-facing message and the internal note — for review and copy. Keyboard-driven.
+It encodes exactly one judgement, stated openly in the source: that putting complainant and defendant side by side is worth doing early. Everything else is verbatim — if you'd have to trust the script's *reading* of something rather than check it at a glance, it isn't shown.
 
-Composition runs strictly *after* judgement. Nothing pre-selects a route or orders them by likelihood. Templates throw on an unresolved token rather than emitting a half-filled message to a real person.
+### 3. Signal Surfacer
+Runs a pattern set over the transcript and claim statement, flagging off-platform solicitation, third-party payment indicators, release pressure, unverified bank-delay claims, and re-trade requests. Each flag carries the line it matched, who said it, and why the pattern exists. Clicking it jumps to the source.
+
+**It has no verdict.** It cannot restrict, score, rank, or recommend. It answers one question — *is there a line here you would want to have read?* — and hands the line back.
+
+That limit is the most important design decision in the repository, for two reasons. An operator shown a conclusion starts agreeing with it; give people a confidence score and within a week they're reviewing the score instead of the case, and the automation is silently deciding outcomes it was never validated to decide. And a pattern matcher cannot see the coercion phrased politely or the scam that used none of these words — something with no concept of its own blind spots has no business producing a verdict.
+
+So it optimises for recall and accepts false positives as the price. A false positive costs a second of reading. A missed off-platform solicitation costs a user their money.
+
+### 4. Macro Launcher
+One keystroke opens a fuzzy-filtered palette. Type three letters, hit enter, and the macro is inserted with every field resolved from the open case.
+
+A dropdown is fine at eight entries and hostile at sixty — you stop reading it and start scrolling it, so people use the six they can find and hand-type the rest. The library grows and its usable surface doesn't. Fuzzy filtering makes recall beat recognition: you don't need to know where "third-party payment" sits in the list, only that it matches `tpp`. That's the difference between a library of sixty that gets used and one that decays into six.
+
+**If a template needs a field the case doesn't have, it refuses to insert** and says which token was missing. The tempting alternative — insert it with the gap left in — is how `{{orderRef}}` ends up in front of a user, because the operator is moving fast and the placeholder looks like text.
+
+### 5. Resolution Composer
+After the operator picks a route, fills that route's templates from live case data and produces both artefacts — the user-facing message and the internal note.
+
+Composition runs strictly *after* judgement. Nothing suggests a route, pre-selects one, or sorts them by likelihood. The moment a composer starts ranking routes it becomes a decision system wearing a text editor's clothes, and it gets evaluated as one by nobody, because it still looks like a formatting convenience.
+
+Only the internal note can be inserted automatically. Anything a real person receives passes through a human's eyes at full attention — one copy step is the cheapest possible way to guarantee that.
+
+### 6. Compound Resolution
+Runs a full resolution as one gesture: send the user message, record the case note, close the claim.
+
+The naive version of this — three clicks behind one keystroke — takes ten minutes to write and is actively dangerous. **A browser UI has no transactions.** A chain that assumes success produces *partial* failures: the message goes out, the note never saves, the claim stays open. The user has been told their case is resolved; the audit trail says nobody touched it. Partial failure is worse than no automation, because no automation fails visibly and this fails silently.
+
+So `PL.chain` supplies the properties the UI doesn't have:
+
+| Property | What it prevents |
+|---|---|
+| **Preflight** | Aborting at step three. Conditions are checked while nothing has happened yet — the only mechanism that avoids partial state rather than reporting it afterwards. |
+| **Verify** | Trusting the click. Each step polls the page for evidence it landed; a save that silently didn't persist is the failure that costs most to discover late. |
+| **Abort** | Continuing into steps that assume success. |
+| **Report** | Silent partial failure. On abort the operator is told exactly which steps committed, before they retry and double-send. |
+| **Lock** | Overlapping runs. Impatient double-taps collapse to one. |
+| **Once** | Re-running a completed chain on the same case. Double-sending a resolution to someone who just lost money is not recoverable. |
+| **Confirm** | Irreversible steps happening unattended — and the dialog shows what already committed before asking. |
+
+Three design calls worth stating, because they're the ones a reviewer should push back on:
+
+**It does not retry.** Retrying a step that may have half-succeeded risks double-sending to a user.
+
+**It does not roll back.** Rollback is a lie in a UI with no undo — claiming to have reverted something you only clicked at is a worse failure than honestly reporting the partial state. On abort it names what committed and tells the operator to finish by hand.
+
+**Only the irreversible step confirms.** Confirming everything trains people to dismiss dialogs unread, which destroys the value of the one dialog that matters.
+
+One bug in this script is worth mentioning because it's the kind only testing finds: the host renders an empty-state placeholder row when a case has no notes, so counting table rows to verify "the note saved" never confirmed on a first-note case — the chain hung on exactly the cases with no history. The verification now counts real note cells. Reading the code would not have caught it.
+
+### 7. Macro Matrix
+Generates the full case-type × action grid — six types by eight actions here, forty-eight macros — from **one execution skeleton**. Types and actions are declared as data; only wording varies per cell.
+
+This is the script that answers *how does a suite reach seventy-odd macros without collapsing*. Written individually, seventy-two macros aren't seventy-two units of work, they're seventy-two units of **divergence**: a fix to deadline parsing lands in the four you remembered and the other sixty-eight keep the bug. As a matrix, a fix to sequencing, verification or language routing lands everywhere at once and *cannot* land unevenly. A seventh case type is a data entry, not a new file.
+
+Three things in the skeleton worth reading:
+
+**Language is resolved per party, from that party's own messages.** The two sides of a dispute frequently don't share a language. Outbound messages are translated into each recipient's; **internal notes are never translated**, so any colleague or auditor can pick up any case cold. Getting that backwards produces an audit trail nobody can read — far more expensive than an awkward translation. Open claim **PL-205188** to see it: the buyer writes Spanish, the seller writes English, same case.
+
+**Saves are verified by a unique marker, not by counting rows.** On a shared queue, a colleague saving at the same instant satisfies a row count and produces a false confirmation for a write that never landed. Verify by identity, never by position.
+
+**The review gate stops the chain immediately before the save.** The chain can prove a save happened; it cannot prove the text was right, and a confidently-executed wrong note is authoritative, permanent, and believed by the next person who reads it. So the mechanical work completes, then the wording comes back for editing. That's the line between automating the typing and automating the judgement.
+
+---
+
+## Repository layout
+
+```
+core/pl-core.js      the shared runtime — every script depends on this and nothing else
+scripts/             seven userscripts, each one file
+docs/                the demo console (GitHub Pages root)
+guide/               ARCHITECTURE · dom-cookbook · adding-a-macro · troubleshooting
+build/validate.js    syntax + metadata gate
+tests/               jsdom harness driving the real demo page
+.github/workflows/   CI: validate, then run the tests
+```
+
+```bash
+node build/validate.js   # syntax, metadata, duplicate @name, guards
+npm test                 # the above plus behavioural tests
+```
+
+Validation is not ceremony. **A userscript with a syntax error fails silently** — the extension accepts it, it never runs, and the only clue is a button that stopped appearing. Every check in `validate.js` exists because the failure it catches is invisible.
 
 ---
 
 ## Architecture
 
 ```
-       ┌──────────────────────────────────────────────┐
-       │   context-aggregator  signal-surfacer        │
-       │              resolution-composer             │
-       │                                              │
-       │   consume a plain Case object. No selectors.  │
-       └────────────────────┬─────────────────────────┘
-                            │
-       ┌────────────────────▼─────────────────────────┐
-       │                 pl-core.js                   │
-       │                                              │
-       │  ui       one docked panel, shared sections  │
-       │  hotkeys  one listener for the whole toolkit │
-       │  template strict tokens, loud failure        │
-       │  watch    SPA-safe case-change detection     │
-       │  ─────────────────────────────────────────   │
-       │  adapter  ← the ONLY DOM-coupled code        │
-       └────────────────────┬─────────────────────────┘
-                            │
-                   ┌────────▼────────┐
-                   │   host console   │
-                   └─────────────────┘
+  ┌───────────────────────────────────────────────────────────────┐
+  │ auto-claim aggregator surfacer macros composer compound matrix│
+  │                                                               │
+  │  consume plain Case / QueueRow objects. Zero selectors.       │
+  └───────────────────────────┬───────────────────────────────────┘
+                              │
+  ┌───────────────────────────▼───────────────────────────────────┐
+  │                         pl-core.js                            │
+  │                                                               │
+  │   ui         one docked panel, shared sections                │
+  │   overlay    keyboard-first filter palette                    │
+  │   hotkeys    one listener for the whole toolkit               │
+  │   poll       backoff · hard stop · no overlap                 │
+  │   chain      preflight · verify · abort · report · lock        │
+  │   waitFor    poll a condition instead of guessing a delay      │
+  │   review     the pause before an irreversible write            │
+  │   lang       per-party detection · translate out, never notes  │
+  │   marker     verification that survives concurrent writes      │
+  │   timer      an interval that survives a backgrounded tab      │
+  │   spa        native setters · real pointer events · visibility │
+  │   template   strict tokens, loud failure                      │
+  │   insert     framework-safe writes into host fields           │
+  │   watch      SPA-safe case-change detection                   │
+  │   ───────────────────────────────────────────────────────     │
+  │   adapter    ← the ONLY DOM-coupled code in the project       │
+  └───────────────────────────┬───────────────────────────────────┘
+                              │
+                     ┌────────▼────────┐
+                     │  host console   │
+                     └─────────────────┘
 ```
 
-**One layer is allowed to know what the page looks like.** `PL.adapter` converts pixels into a normalised `Case` object and stops — it makes no decisions and ranks nothing. Everything above it operates on data and has no idea whether it came from a scrape, an API, or a fixture.
+**One layer is allowed to know what the page looks like.** `PL.adapter` converts pixels into a normalised object and stops — it makes no decisions, ranks nothing, filters nothing. Everything above it operates on data and has no idea whether it came from a scrape, an API, or a fixture.
 
-When the host application ships a redesign, one function breaks instead of three scripts. That boundary is the reason a toolkit like this survives contact with a product team that ships weekly — and the reason the same scripts kept running through interface changes rather than being rewritten each time.
+When the host ships a redesign, one function breaks instead of five scripts. That boundary is the reason a toolkit like this survives contact with a product team that ships weekly, and the reason the same scripts kept running through interface changes rather than being rewritten each time.
 
-Two smaller decisions worth noting:
+Three smaller decisions that came from things going wrong:
 
 - **`PL.watch`** — single-page apps don't reload. A script bound to `document-ready` runs once and then quietly goes stale, which is worse than not running at all, because the operator keeps trusting it. Case identity is observed and debounced instead.
-- **`PL.template`** — an unresolved token raises rather than rendering `Dear {{name}}` into something an operator then sends. Loud failure beats quiet embarrassment.
+- **`PL.template`** — an unresolved token raises rather than rendering `Dear {{name}}` into something an operator then sends.
+- **`PL.adapter.readKv`** — the host renders "not applicable" as a dash. Normalising that to empty *at the boundary* is what lets the template layer fail properly instead of emitting `released -` into a user's message. Host presentation conventions get resolved once, at the edge, rather than leaking into every consumer.
 
 ---
 
 ## Try it
 
 1. Install [Tampermonkey](https://www.tampermonkey.net/) (Chrome, Firefox, Edge, Safari).
-2. Click a script below — Tampermonkey will offer to install it.
+2. Click each script below — Tampermonkey will offer to install it.
+   - [Queue Auto-Claim](https://raw.githubusercontent.com/cvidal22/peerledger-workflow-toolkit/main/scripts/queue-auto-claim.user.js)
    - [Context Aggregator](https://raw.githubusercontent.com/cvidal22/peerledger-workflow-toolkit/main/scripts/context-aggregator.user.js)
    - [Signal Surfacer](https://raw.githubusercontent.com/cvidal22/peerledger-workflow-toolkit/main/scripts/signal-surfacer.user.js)
+   - [Macro Launcher](https://raw.githubusercontent.com/cvidal22/peerledger-workflow-toolkit/main/scripts/macro-launcher.user.js)
    - [Resolution Composer](https://raw.githubusercontent.com/cvidal22/peerledger-workflow-toolkit/main/scripts/resolution-composer.user.js)
-3. Open the **[demo console](https://cvidal22.github.io/peerledger-workflow-toolkit/)** and click through the work basket.
+   - [Compound Resolution](https://raw.githubusercontent.com/cvidal22/peerledger-workflow-toolkit/main/scripts/compound-resolution.user.js)
+   - [Macro Matrix](https://raw.githubusercontent.com/cvidal22/peerledger-workflow-toolkit/main/scripts/macro-matrix.user.js)
+3. Open the **[demo console](https://cvidal22.github.io/peerledger-workflow-toolkit/)**.
 
-The toolkit panel docks on the right. `Alt+\` collapses it, `Alt+1` jumps to the transcript, `Alt+Q/W/E/R` compose a resolution route.
+Install order doesn't matter — the core loads via `@require`, and every script calls `PL.requireCore()` and refuses to start rather than degrading silently if it's missing. If you upgrade, **remove the old versions first**: two copies of a script bind two listeners and everything fires twice.
 
-Claim **PL-204902** is a good first read — the transcript contains two flagged lines, and the recovery-claim route composes cleanly from it.
+**A 60-second tour:** open the unassigned pool (`Alt+P`), arm auto-claim (`Alt+A`), and watch it pull a case. Then open **PL-204902** from your queue — the brief fills, three policy patterns flag. Hit `Alt+K`, type `tpp`, press enter: a macro lands in the note field with the order reference and both handles already filled. Then `Alt+W` composes the recovery route.
+
+**To see the matrix,** press `Alt+M` on claim **PL-205160** — cells matching the open case sort to the top. Run `OVP · Recovery opened`: the outbound message goes out in Portuguese, and the note comes back to you in English for review before it saves.
+
+**To see the chain runner do its job, try to break it.** On a fresh case, press `Alt+1` — message, note and close all execute and verify in sequence. Now open a different case, send a message by hand first, and press `Alt+1` again: preflight refuses and *nothing runs*, because a second message to the same user is the failure it exists to prevent.
+
+| Key | Action |
+|---|---|
+| `Alt+A` | Arm / disarm auto-claim |
+| `Alt+P` | Jump to the unassigned pool |
+| `Alt+K` | Macro palette |
+| `Alt+2` | Scroll to the transcript |
+| `Alt+Q/W/E/R` | Compose a resolution route |
+| `Alt+1` / `Alt+2` | Run a full resolution chain |
+| `Alt+M` | Macro matrix (48 cells, this case's type first) |
+| `Alt+\` | Collapse the panel |
 
 ---
 
 ## What this is not
 
 - Not a scraper for any real platform. The `@match` rule targets the demo page only.
-- Not an automated decision system. Three scripts, zero verdicts.
-- Not a framework. It is small on purpose; the interesting part is the boundary, not the line count.
+- Not an automated decision system. Seven scripts, zero verdicts — the chain executes a decision a human already made.
+- Not a framework. It's small on purpose; the interesting part is the boundary, not the line count.
 
 ---
 
 ## Result
 
-The same approach applied to my own queue sustains roughly double the team throughput target, and thirteen of the process changes behind it were adopted as standard practice across the team.
+The real suite behind this is roughly 95 active userscripts covering six case types, sustaining about double the team throughput target. It is in active use by colleagues on the team, with formal organisation-wide rollout pending internal audit sign-off. Thirteen separate process improvements developed alongside it were adopted as standard practice.
 
-The number is the outcome. The decomposition above is the method.
+Other people depending on it is the part that shaped the engineering: tooling only you use can fail quietly, because you know what it does. Tooling colleagues rely on has to survive workflows it wasn't designed for and operators who won't read the notes — which is most of why the failure handling and the review gate exist.
+
+The numbers are the outcome. The [decomposition](#the-decomposition) and the [engineering notes](ENGINEERING-NOTES.md) are the method.
 
 ---
 

@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         PeerLedger — Resolution Composer
 // @namespace    https://github.com/cvidal22
-// @version      1.0.0
-// @description  Once the operator has chosen a resolution route, assembles the outbound instruction and the internal case note from live case data. Keyboard-driven.
+// @version      3.0.0
+// @description  After the operator chooses a resolution route, assembles the outbound user message and the internal case note from live case data. Composition runs strictly after judgement.
 // @author       cvidal22
 // @match        https://cvidal22.github.io/peerledger-workflow-toolkit/*
 // @require      https://cdn.jsdelivr.net/gh/cvidal22/peerledger-workflow-toolkit@main/core/pl-core.js
@@ -15,29 +15,42 @@
  *
  * The decision takes thirty seconds. Writing it up takes two minutes: restate
  * the order reference, restate the amount, restate the parties, explain the
- * route in the register the user will understand, then write the internal note
- * again in a different register for the audit trail. Same facts, retyped, and
- * every retype is a chance to transpose a digit.
+ * route in language a distressed user will understand, then write it again in
+ * a different register for the audit trail. Same facts, twice, by hand, and
+ * every retype is a chance to transpose a digit into a message that goes to
+ * someone who has just lost money.
  *
  * WHAT THIS DOES
  *
- * The operator picks a route. The script fills that route's template from the
- * case data already on the page and produces both artefacts — the user-facing
- * message and the internal note — ready to review and copy.
+ * The operator picks a route. The script fills that route's two templates and
+ * produces both artefacts for review — the user-facing message and the internal
+ * note — which is the point at which they become editable text rather than
+ * typing.
  *
- * THE ORDER OF OPERATIONS IS THE POINT
+ * ORDER OF OPERATIONS IS THE WHOLE DESIGN
  *
- * Composition happens strictly after judgement. Nothing here suggests a route,
- * pre-selects one, or ranks them by likelihood. The script has no opinion about
- * which outcome is correct; it only refuses to make a human retype an order
- * reference for the four-thousandth time.
+ * Nothing here suggests a route, pre-selects one, sorts them by likelihood, or
+ * greys out the ones it thinks are wrong. The script has no opinion about which
+ * outcome is correct — it has never been validated to have one — it only
+ * declines to make a person retype an order reference for the four-thousandth
+ * time.
  *
- * Templates fail loudly on a missing token (see PL.template) rather than
- * emitting a half-filled message to a user.
+ * The moment a composer starts ranking routes it becomes a decision system
+ * wearing a text editor's clothes, and it would be evaluated as one by nobody,
+ * because it still looks like a formatting convenience.
+ *
+ * The user-facing message is never inserted automatically. It is written into
+ * the panel for reading. Anything a real person receives should pass through a
+ * human's eyes at full attention, and the friction of one copy step is the
+ * cheapest possible way to guarantee that.
  */
 
 (function () {
   "use strict";
+
+  if (!PL.guard("resolution-composer")) return;
+  PL.requireCore("3.0.0");
+  PL.register("resolution-composer", "3.0.0");
 
   var ROUTES = [
     {
@@ -46,15 +59,15 @@
       key: "alt+q",
       message:
         "Hello,\n\n" +
-        "We have reviewed your claim on order {{orderRef}} ({{fiatValue}}) and need additional documentation before we can proceed.\n\n" +
-        "Please provide a complete bank statement covering {{window}}, showing the account holder name and the full transaction record. Screenshots of a single transaction are not sufficient for this claim type.\n\n" +
-        "You can upload the document in the claim page. This claim remains open while we wait.\n\n" +
+        "We have reviewed your claim on order {{orderRef}} ({{fiat}}) and need additional documentation before we can proceed.\n\n" +
+        "Please provide a complete bank statement covering the period from {{created}} onward, showing the account holder name and the full transaction record. A screenshot of a single transaction is not sufficient for this claim type.\n\n" +
+        "You can upload the document on the claim page. Your claim stays open while we wait.\n\n" +
         "PeerLedger Dispute Operations",
       note:
         "[{{claimId}}] {{typeLabel}} — evidence requested.\n" +
-        "Order {{orderRef}} · {{fiatValue}} · status {{status}}.\n" +
-        "Parties: seller {{seller}} / buyer {{buyer}}.\n" +
-        "Submitted so far: {{evidenceCount}} item(s). Full statement requested; insufficient to determine settlement from current material.\n" +
+        "Order {{orderRef}} · {{fiat}} · {{status}}.\n" +
+        "Complainant {{complainant}} / defendant {{defendant}}.\n" +
+        "{{evidenceCount}} item(s) on file — insufficient to determine settlement. Full statement requested from {{created}}.\n" +
         "Awaiting complainant."
     },
     {
@@ -63,47 +76,48 @@
       key: "alt+w",
       message:
         "Hello,\n\n" +
-        "We have completed our review of order {{orderRef}} ({{fiatValue}}) and opened a recovery claim on your behalf.\n\n" +
+        "We have completed our review of order {{orderRef}} ({{fiat}}) and opened a recovery claim on your behalf.\n\n" +
         "The counterparty account has been restricted for the disputed amount while we contact them. If they confirm the funds were received in error, the amount will be returned to you and you will be notified here.\n\n" +
         "No further action is needed from you at this stage.\n\n" +
         "PeerLedger Dispute Operations",
       note:
         "[{{claimId}}] {{typeLabel}} — recovery claim opened.\n" +
-        "Order {{orderRef}} · {{fiatValue}} · status {{status}}.\n" +
-        "Parties: seller {{seller}} / buyer {{buyer}}.\n" +
-        "Evidence reviewed: {{evidenceCount}} item(s). Complainant material consistent with claim; counterparty restricted for disputed amount pending response.\n" +
+        "Order {{orderRef}} · {{fiat}} · {{status}} · released {{released}}.\n" +
+        "Complainant {{complainant}} ({{complainantOrders}} orders / {{complainantDisputes}} disputes) vs " +
+        "defendant {{defendant}} ({{defendantOrders}} orders / {{defendantDisputes}} disputes).\n" +
+        "{{evidenceCount}} item(s) reviewed; consistent with the claim. Counterparty restricted for the disputed amount.\n" +
         "Next: counterparty statement."
     },
     {
       id: "reject_claim",
-      label: "Reject claim",
+      label: "Claim not upheld",
       key: "alt+e",
       message:
         "Hello,\n\n" +
-        "We have completed our review of order {{orderRef}} ({{fiatValue}}) and are unable to uphold your claim.\n\n" +
-        "The material provided does not establish that the payment failed to reach the counterparty as described. The order will remain in its current state.\n\n" +
-        "If you obtain further documentation, you may reply here and we will reopen the review.\n\n" +
+        "We have completed our review of order {{orderRef}} ({{fiat}}) and are unable to uphold your claim.\n\n" +
+        "The material provided does not establish that the payment failed as described. The order will remain in its current state.\n\n" +
+        "If you obtain further documentation, reply here and we will reopen the review.\n\n" +
         "PeerLedger Dispute Operations",
       note:
-        "[{{claimId}}] {{typeLabel}} — claim not upheld.\n" +
-        "Order {{orderRef}} · {{fiatValue}} · status {{status}}.\n" +
-        "Parties: seller {{seller}} / buyer {{buyer}}.\n" +
-        "Evidence reviewed: {{evidenceCount}} item(s). Insufficient to establish the claimed failure. Complainant advised of reopening path.\n" +
+        "[{{claimId}}] {{typeLabel}} — not upheld.\n" +
+        "Order {{orderRef}} · {{fiat}} · {{status}}.\n" +
+        "Complainant {{complainant}} / defendant {{defendant}}.\n" +
+        "{{evidenceCount}} item(s) reviewed; insufficient to establish the claimed failure. Complainant advised of reopening path.\n" +
         "Closed."
     },
     {
-      id: "policy_breach",
-      label: "Escalate policy breach",
+      id: "policy_referral",
+      label: "Policy referral",
       key: "alt+r",
       message:
         "Hello,\n\n" +
-        "During our review of order {{orderRef}} we identified activity in the trade chat that is not permitted under the platform trading rules.\n\n" +
-        "This has been referred to the account integrity team. Your claim on this order continues to be reviewed separately and is not affected by this referral.\n\n" +
+        "While reviewing order {{orderRef}} we identified activity in the trade chat that is not permitted under the platform trading rules.\n\n" +
+        "This has been referred to our account integrity team. Your claim on this order continues to be reviewed separately and is not affected by the referral.\n\n" +
         "PeerLedger Dispute Operations",
       note:
         "[{{claimId}}] {{typeLabel}} — referred to account integrity.\n" +
-        "Order {{orderRef}} · {{fiatValue}} · status {{status}}.\n" +
-        "Parties: seller {{seller}} / buyer {{buyer}}.\n" +
+        "Order {{orderRef}} · {{fiat}} · {{status}}.\n" +
+        "Complainant {{complainant}} / defendant {{defendant}}.\n" +
         "Transcript contains conduct outside trading rules. Referred for independent assessment; dispute review continues on its own track.\n" +
         "Referred."
     }
@@ -111,79 +125,88 @@
 
   function vars(c) {
     return {
-      claimId: c.id,
-      typeLabel: c.typeLabel,
-      orderRef: c.order.ref,
-      fiatValue: c.order.fiatValue,
-      status: c.order.status,
-      seller: c.parties.seller.handle,
-      buyer: c.parties.buyer.handle,
-      evidenceCount: String(c.evidence.length),
-      window: c.order.createdAt.slice(0, 10) + " to today"
+      claimId: c.id, typeLabel: c.typeLabel,
+      orderRef: c.order.ref, fiat: c.order.fiat, status: c.order.status,
+      created: c.order.createdAt, released: c.order.releasedAt || "not released",
+      complainant: c.complainant.handle, defendant: c.defendant.handle,
+      complainantOrders: String(c.complainant.orders),
+      complainantDisputes: String(c.complainant.disputes),
+      defendantOrders: String(c.defendant.orders),
+      defendantDisputes: String(c.defendant.disputes),
+      evidenceCount: String(c.evidence.length)
     };
   }
 
-  function render(body, c) {
+  var body = PL.ui.section("composer", "Resolution composer");
+
+  function render(c) {
     PL.ui.clear(body);
+    if (!c) { body.appendChild(PL.dom.el("div", { class: "pl-none", text: "Open a case." })); return; }
+
+    body.setHeaderRight(c.id);
 
     var out = PL.dom.el("textarea", { class: "pl-out", spellcheck: "false" });
     var active = null;
+    var v = vars(c);
 
     function compose(route) {
       active = route;
-      Array.prototype.forEach.call(body.querySelectorAll(".pl-btn"), function (b) {
-        b.classList.toggle("pl-on", b.dataset.route === route.id);
+      PL.dom.qsa(".pl-btn", body).forEach(function (b) {
+        b.classList.toggle("on", b.getAttribute("data-route") === route.id);
       });
       try {
-        var v = vars(c);
         out.value =
-          "— MESSAGE TO USER —\n\n" +
-          PL.template.render(route.message, v) +
-          "\n\n— INTERNAL CASE NOTE —\n\n" +
-          PL.template.render(route.note, v);
+          "— MESSAGE TO USER —\n\n" + PL.template.render(route.message, v) +
+          "\n\n— INTERNAL CASE NOTE —\n\n" + PL.template.render(route.note, v);
       } catch (err) {
         out.value = "Composition halted: " + err.message +
-          "\n\nThe case data needed for this template is missing from the page. Nothing was generated.";
+          "\n\nThis case has no value for that field. Nothing was generated — " +
+          "a half-filled message is worse than none.";
       }
     }
 
     ROUTES.forEach(function (r) {
-      var btn = PL.dom.el("button", {
-        class: "pl-btn",
-        text: r.label,
-        title: r.key.toUpperCase(),
+      var b = PL.dom.el("button", {
+        class: "pl-btn", text: r.label, title: r.key.toUpperCase(),
         onclick: function () { compose(r); }
       });
-      btn.dataset.route = r.id;
-      body.appendChild(btn);
+      b.setAttribute("data-route", r.id);
+      body.appendChild(b);
     });
 
     body.appendChild(out);
 
     body.appendChild(PL.dom.el("button", {
-      class: "pl-btn",
-      text: "Copy both",
+      class: "pl-btn", text: "Copy both",
       onclick: function () {
-        if (!active) return;
+        if (!active) { PL.ui.toast("Pick a route first."); return; }
         PL.clipboard.copy(out.value);
-        PL.log("composer", "copied " + active.id + " for " + c.id);
+        PL.ui.toast("Copied.");
+      }
+    }));
+
+    body.appendChild(PL.dom.el("button", {
+      class: "pl-btn", text: "Note → field",
+      onclick: function () {
+        if (!active) { PL.ui.toast("Pick a route first."); return; }
+        var noteOnly = out.value.split("— INTERNAL CASE NOTE —")[1];
+        if (!noteOnly) return;
+        PL.insert(PL.adapter.noteField(), noteOnly.trim(), "append");
+        PL.ui.toast("Note inserted. The user message is not auto-sent.");
       }
     }));
 
     body.appendChild(PL.dom.el("div", {
       class: "pl-hint",
-      text: "Pick a route after you have decided it. Alt+Q / W / E / R. Every field is drawn from this case — read before sending."
+      text: "Pick a route after you have decided it. Alt+Q / W / E / R."
+    }));
+    body.appendChild(PL.dom.el("div", {
+      class: "pl-hint",
+      text: "Only the internal note can be inserted. Anything a user reads goes through your eyes first."
     }));
 
-    ROUTES.forEach(function (r) {
-      PL.hotkeys.bind(r.key, function () { compose(r); });
-    });
+    ROUTES.forEach(function (r) { PL.hotkeys.bind(r.key, function () { if (PL.adapter.caseKey()) compose(r); }); });
   }
 
-  var body = PL.ui.section("composer", "Resolution composer");
-
-  PL.watch(PL.adapter.caseKey, function () {
-    var c = PL.adapter.readCase();
-    if (c) render(body, c);
-  });
+  PL.watch(PL.adapter.caseKey, function () { render(PL.adapter.readCase()); });
 })();
