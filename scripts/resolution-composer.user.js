@@ -1,11 +1,11 @@
 // ==UserScript==
 // @name         PeerLedger — Resolution Composer
 // @namespace    https://github.com/cvidal22
-// @version      3.0.0
+// @version      3.1.0
 // @description  After the operator chooses a resolution route, assembles the outbound user message and the internal case note from live case data. Composition runs strictly after judgement.
 // @author       cvidal22
 // @match        https://cvidal22.github.io/peerledger-workflow-toolkit/*
-// @require      https://cdn.jsdelivr.net/gh/cvidal22/peerledger-workflow-toolkit@main/core/pl-core.js?v=3.0.1
+// @require      https://cdn.jsdelivr.net/gh/cvidal22/peerledger-workflow-toolkit@main/core/pl-core.js?v=3.1.0
 // @grant        none
 // @run-at       document-idle
 // ==/UserScript==
@@ -161,13 +161,12 @@ if (typeof PL === "undefined") return;
     };
   }
 
-  var body = PL.ui.section("composer", "Resolution composer");
-
-  function render(c) {
+  function render(body) {
+    var c = PL.adapter.readCase();
     PL.ui.clear(body);
     if (!c) { body.appendChild(PL.dom.el("div", { class: "pl-none", text: "Open a case." })); return; }
 
-    body.setHeaderRight(c.id);
+    if (body.setHeaderRight) body.setHeaderRight(c.id);
 
     var out = PL.dom.el("textarea", { class: "pl-out", spellcheck: "false" });
     var active = null;
@@ -232,5 +231,17 @@ if (typeof PL === "undefined") return;
     ROUTES.forEach(function (r) { PL.hotkeys.bind(r.key, function () { if (PL.adapter.caseKey()) compose(r); }); });
   }
 
-  PL.watch(PL.adapter.caseKey, function () { render(PL.adapter.readCase()); });
+  PL.ui.button({
+    id: "composer",
+    label: "Compose",
+    title: "Resolution composer",
+    pages: ["case"],
+    render: render
+  });
+
+  PL.watch(PL.adapter.caseKey, function () {
+    PL.ui.refresh();
+    var live = PL.ui.liveBody("composer");
+    if (live) render(live);
+  });
 })();

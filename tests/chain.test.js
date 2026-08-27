@@ -17,10 +17,21 @@ load("docs/data.js"); load("docs/app.js"); load("core/pl-core.js");
   .forEach(s => load(`scripts/${s}.user.js`));
 
 const $ = s => w.document.querySelector(s);
+/* The toolkit is a dock of buttons; content lives in a popover opened from
+   one. These helpers keep the tests reading like operator actions. */
+const openBtn = (w, label) => {
+  const b = [...w.document.querySelectorAll("#pl-dock .pl-b")]
+    .find(x => x.querySelector(".lb").textContent === label);
+  if (!b) throw new Error("no button labelled " + label);
+  b.dispatchEvent(new w.MouseEvent("click", { bubbles: true }));
+  return w.document.getElementById("pl-pop-b");
+};
+const popBody = (w) => w.document.getElementById("pl-pop-b");
+
 const $$ = s => [...w.document.querySelectorAll(s)];
 const click = el => el.dispatchEvent(new w.MouseEvent("click", { bubbles: true }));
 const wait = ms => new Promise(r => setTimeout(r, ms));
-const panel = () => $('[data-pl-section="compound"]');
+const panel = () => popBody(w) || openBtn(w, "Resolve + Close");
 
 // auto-confirm irreversible dialogs
 const autoConfirm = () => {
@@ -36,14 +47,14 @@ const autoConfirm = () => {
   w.location.hash = "#/claim/PL-204871";
   await wait(250);
   console.log("state:", $("#main").getAttribute("data-claim-state"));
-  console.log("buttons:", $$('[data-pl-section="compound"] .pl-btn').map(b => b.textContent));
+  console.log("buttons:", [...(popBody(w)||openBtn(w,"Resolve + Close")).querySelectorAll(".pl-btn")].map(b => b.textContent));
 
   const stop = autoConfirm();
-  click($$('[data-pl-section="compound"] .pl-btn')[0]);
+  click([...(popBody(w)||openBtn(w,"Resolve + Close")).querySelectorAll(".pl-btn")][0]);
   await wait(6000);
   stop();
 
-  console.log("steps:", $$('[data-pl-section="compound"] .pl-step').map(s => s.textContent.trim()));
+  console.log("steps:", [...(popBody(w)||openBtn(w,"Resolve + Close")).querySelectorAll(".pl-step")].map(s => s.textContent.trim()));
   console.log("claim state now:", $("#main").getAttribute("data-claim-state"));
   console.log("messages sent:", $$("#sent-log .sent:not(.none)").length);
   console.log("notes:", $$("#notes-table tbody tr").length);
@@ -62,7 +73,7 @@ const autoConfirm = () => {
   click($("#msg-send"));
   await wait(900);
   console.log("sent count:", $$("#sent-log .sent:not(.none)").length);
-  click($$('[data-pl-section="compound"] .pl-btn')[0]);
+  click([...(popBody(w)||openBtn(w,"Resolve + Close")).querySelectorAll(".pl-btn")][0]);
   await wait(500);
   console.log("result:", panel().textContent.replace(/\s+/g," ").slice(-330));
   console.log("notes (should be 1, unchanged):", $$("#notes-table tbody tr").length);
@@ -77,10 +88,10 @@ const autoConfirm = () => {
   const origClick = closeBtn.click.bind(closeBtn);
   closeBtn.click = () => { throw new Error("close control unavailable"); };
   const stop2 = autoConfirm();
-  click($$('[data-pl-section="compound"] .pl-btn')[0]);
+  click([...(popBody(w)||openBtn(w,"Resolve + Close")).querySelectorAll(".pl-btn")][0]);
   await wait(6000);
   stop2();
-  console.log("steps:", $$('[data-pl-section="compound"] .pl-step').map(s => s.textContent.trim()));
+  console.log("steps:", [...(popBody(w)||openBtn(w,"Resolve + Close")).querySelectorAll(".pl-step")].map(s => s.textContent.trim()));
   console.log("panel tail:", panel().textContent.replace(/\s+/g," ").slice(-420));
   console.log("claim state (should still be open):", $("#main").getAttribute("data-claim-state"));
 

@@ -1,11 +1,11 @@
 // ==UserScript==
 // @name         PeerLedger — Context Aggregator
 // @namespace    https://github.com/cvidal22
-// @version      3.0.0
+// @version      3.1.0
 // @description  Collapses order state, counterparty asymmetry and evidence inventory into one always-visible brief, so the decision starts from a single view.
 // @author       cvidal22
 // @match        https://cvidal22.github.io/peerledger-workflow-toolkit/*
-// @require      https://cdn.jsdelivr.net/gh/cvidal22/peerledger-workflow-toolkit@main/core/pl-core.js?v=3.0.1
+// @require      https://cdn.jsdelivr.net/gh/cvidal22/peerledger-workflow-toolkit@main/core/pl-core.js?v=3.1.0
 // @grant        none
 // @run-at       document-idle
 // ==/UserScript==
@@ -69,16 +69,14 @@ if (typeof PL === "undefined") return;
   PL.requireCore("3.0.0");
   PL.register("context-aggregator", "3.0.0");
 
-  var body = PL.ui.section("aggregator", "Case brief");
-
-  function render(c) {
+  function render(body) {
+    var c = PL.adapter.readCase();
     PL.ui.clear(body);
     if (!c) {
       body.appendChild(PL.dom.el("div", { class: "pl-none", text: "Open a case." }));
       return;
     }
-
-    body.setHeaderRight(c.id);
+    if (body.setHeaderRight) body.setHeaderRight(c.id);
 
     PL.ui.rows([
       ["Type", c.typeLabel],
@@ -123,5 +121,21 @@ if (typeof PL === "undefined") return;
     if (el) el.scrollIntoView({ block: "center", behavior: "smooth" });
   });
 
-  PL.watch(PL.adapter.caseKey, function () { render(PL.adapter.readCase()); });
+  PL.ui.button({
+    id: "aggregator",
+    label: "Brief",
+    title: "Case brief",
+    pages: ["case"],
+    render: render,
+    badge: function () {
+      var c = PL.adapter.readCase();
+      return c ? String(c.evidence.length) : null;
+    }
+  });
+
+  PL.watch(PL.adapter.caseKey, function () {
+    PL.ui.refresh();
+    var live = PL.ui.liveBody("aggregator");
+    if (live) render(live);
+  });
 })();

@@ -17,7 +17,7 @@
 (function (global) {
   "use strict";
 
-  var PL = { version: "3.0.1" };
+  var PL = { version: "3.1.0" };
 
   /* ================================================================
    * dom
@@ -1002,17 +1002,37 @@
    * ================================================================ */
 
   var CSS = [
-    "#pl-panel{position:fixed;top:0;right:0;width:330px;height:100vh;background:#fff;border-left:1px solid #dcdfe4;",
-    "box-shadow:-2px 0 14px rgba(0,0,0,.07);z-index:9000;display:flex;flex-direction:column;",
+    /* ---- left dock: one button per script, stacked ---------------------- */
+    "#pl-dock{position:fixed;left:0;top:22vh;z-index:9000;display:flex;flex-direction:column;gap:5px;",
+    "font:12.5px/1.3 system-ui,-apple-system,sans-serif}",
+    "#pl-dock .pl-b{display:flex;align-items:center;gap:6px;min-width:104px;padding:7px 10px 7px 9px;",
+    "border:1px solid #cfd4da;border-left:0;border-radius:0 4px 4px 0;background:#fff;color:#1b1d22;",
+    "cursor:pointer;font:inherit;text-align:left;box-shadow:1px 1px 5px rgba(0,0,0,.09);white-space:nowrap}",
+    "#pl-dock .pl-b:hover{background:#f4f6f7;border-color:#9aa3ad}",
+    "#pl-dock .pl-b:disabled{opacity:.4;cursor:default;box-shadow:none}",
+    "#pl-dock .pl-b .dot{width:7px;height:7px;border-radius:50%;background:#c3c8cf;flex:0 0 auto}",
+    "#pl-dock .pl-b.on{background:#1f4d5c;border-color:#1f4d5c;color:#fff;font-weight:600}",
+    "#pl-dock .pl-b.on .dot{background:#7fd4a8}",
+    "#pl-dock .pl-b.warn{border-color:#d9b98a;background:#fdf6ea}",
+    "#pl-dock .pl-b.warn .dot{background:#c98a2e}",
+    "#pl-dock .pl-b.open{border-color:#1f4d5c}",
+    "#pl-dock .pl-b .lb{flex:1}",
+    "#pl-dock .pl-b .bd{font-family:ui-monospace,Menlo,monospace;font-size:11px;padding:0 5px;border-radius:8px;",
+    "background:#eceef1;color:#5b616d}",
+    "#pl-dock .pl-b.on .bd{background:rgba(255,255,255,.22);color:#fff}",
+    "#pl-dock .pl-b.warn .bd{background:#f0dcbc;color:#8a5a10}",
+    /* ---- popover anchored to a button ----------------------------------- */
+    "#pl-pop{position:fixed;z-index:9100;width:340px;max-height:74vh;overflow-y:auto;background:#fff;",
+    "border:1px solid #cfd4da;border-radius:4px;box-shadow:0 8px 26px rgba(0,0,0,.16);",
     "font:13px/1.45 system-ui,-apple-system,sans-serif;color:#1b1d22}",
-    "#pl-panel.pl-min{transform:translateX(calc(100% - 30px))}",
-    "#pl-head{display:flex;align-items:center;gap:8px;padding:8px 11px;background:#1b1d22;color:#fff;flex:0 0 auto}",
-    "#pl-head b{font-size:11px;letter-spacing:.07em;text-transform:uppercase;font-weight:650}",
-    "#pl-head .sp{flex:1}#pl-head button{background:none;border:0;color:#fff;cursor:pointer;font-size:15px;padding:0 3px}",
-    "#pl-body{overflow-y:auto;flex:1;min-height:0}",
-    ".pl-sec{border-bottom:1px solid #eaecef;padding:11px 13px}",
-    ".pl-sec h4{margin:0 0 8px;font-size:10px;letter-spacing:.07em;text-transform:uppercase;color:#5b616d;font-weight:650;display:flex}",
-    ".pl-sec h4 .r{margin-left:auto;text-transform:none;letter-spacing:0;color:#8d939e;font-weight:400}",
+    "#pl-pop-h{display:flex;align-items:center;gap:8px;padding:8px 11px;background:#1b1d22;color:#fff;",
+    "border-radius:4px 4px 0 0;position:sticky;top:0}",
+    "#pl-pop-h b{font-size:11px;letter-spacing:.06em;text-transform:uppercase}",
+    "#pl-pop-h .sp{flex:1}",
+    "#pl-pop-h .r{font-family:ui-monospace,Menlo,monospace;font-size:11px;opacity:.75}",
+    "#pl-pop-h button{background:none;border:0;color:#fff;cursor:pointer;font-size:15px;line-height:1;padding:0 2px}",
+    "#pl-pop-b{padding:11px 13px}",
+    /* ---- shared content bits -------------------------------------------- */
     ".pl-row{display:flex;justify-content:space-between;gap:9px;padding:2px 0;font-size:12px}",
     ".pl-row .k{color:#8d939e}.pl-row .v{font-family:ui-monospace,Menlo,monospace;text-align:right}",
     ".pl-sub{margin:11px 0 6px;font-size:10px;letter-spacing:.07em;text-transform:uppercase;color:#5b616d;font-weight:650}",
@@ -1023,23 +1043,10 @@
     ".pl-none{color:#8d939e;font-size:12px}",
     ".pl-btn{font:inherit;font-size:12px;padding:5px 9px;border:1px solid #dcdfe4;background:#fff;border-radius:2px;cursor:pointer;margin:0 5px 5px 0}",
     ".pl-btn:hover{border-color:#8d939e}.pl-btn.on{background:#1f4d5c;border-color:#1f4d5c;color:#fff}",
+    ".pl-btn:disabled{opacity:.45;cursor:default}",
     ".pl-out{width:100%;min-height:130px;font:11.5px/1.5 ui-monospace,Menlo,monospace;border:1px solid #dcdfe4;padding:7px;resize:vertical;margin-top:7px}",
     ".pl-hint{font-size:11px;color:#8d939e;margin-top:5px}",
     ".pl-quote{font-size:11.5px;color:#5b616d;border-left:2px solid #dcdfe4;padding-left:7px;margin:3px 0}",
-    ".pl-dot{width:7px;height:7px;border-radius:50%;display:inline-block;margin-right:5px}",
-    ".pl-dot.on{background:#1d6949}.pl-dot.off{background:#8d939e}",
-    /* overlay */
-    "#pl-ov{position:fixed;inset:0;background:rgba(15,17,20,.42);z-index:9500;display:flex;align-items:flex-start;justify-content:center;padding-top:11vh}",
-    "#pl-ov-box{background:#fff;width:min(620px,92vw);border-radius:3px;box-shadow:0 18px 50px rgba(0,0,0,.3);overflow:hidden;",
-    "font:13px/1.45 system-ui,-apple-system,sans-serif}",
-    "#pl-ov-in{width:100%;border:0;border-bottom:1px solid #dcdfe4;padding:13px 15px;font:15px system-ui;outline:none}",
-    "#pl-ov-list{max-height:52vh;overflow-y:auto}",
-    ".pl-ov-i{padding:9px 15px;border-bottom:1px solid #eaecef;cursor:pointer;display:flex;gap:10px;align-items:baseline}",
-    ".pl-ov-i.sel{background:#e8f0f2}",
-    ".pl-ov-i .nm{font-weight:600;font-size:12.5px}",
-    ".pl-ov-i .tags{margin-left:auto;font-size:10.5px;color:#8d939e;font-family:ui-monospace,Menlo,monospace}",
-    ".pl-ov-i .pv{font-size:11.5px;color:#5b616d;margin-top:2px;display:block;width:100%}",
-    "#pl-ov-foot{padding:8px 15px;font-size:11px;color:#8d939e;background:#f8f9fa;display:flex;gap:14px}",
     ".pl-step{display:flex;gap:7px;align-items:baseline;font-size:11.5px;padding:2px 0}",
     ".pl-step .ic{width:13px;text-align:center;font-family:ui-monospace,Menlo,monospace}",
     ".pl-step.done .ic{color:#1d6949}.pl-step.failed .ic{color:#8f2f2c}",
@@ -1048,49 +1055,204 @@
     ".pl-warn{border-left:3px solid #8f2f2c;background:#fbecea;padding:6px 8px;margin-top:7px;font-size:11.5px;color:#8f2f2c}",
     ".pl-okbox{border-left:3px solid #1d6949;background:#e7f2ed;padding:6px 8px;margin-top:7px;font-size:11.5px;color:#1d6949}",
     ".pl-pre{border-left:3px solid #8a5a10;background:#fcf3e2;padding:6px 8px;margin-top:7px;font-size:11.5px;color:#8a5a10}",
+    ".pl-lang{display:inline-block;font-size:10px;font-family:ui-monospace,Menlo,monospace;background:#e8f0f2;color:#1f4d5c;padding:1px 5px;border-radius:2px;margin-left:5px}",
+    ".pl-lang.low{background:#fcf3e2;color:#8a5a10}",
+    ".pl-matrix{font-size:11px;color:#8d939e;font-family:ui-monospace,Menlo,monospace;margin-top:5px}",
+    ".pl-dot{width:7px;height:7px;border-radius:50%;display:inline-block;margin-right:5px}",
+    ".pl-dot.on{background:#1d6949}.pl-dot.off{background:#8d939e}",
+    /* ---- overlay palette -------------------------------------------------- */
+    "#pl-ov{position:fixed;inset:0;background:rgba(15,17,20,.42);z-index:9500;display:flex;align-items:flex-start;justify-content:center;padding-top:11vh}",
+    "#pl-ov-box{background:#fff;width:min(620px,92vw);border-radius:3px;box-shadow:0 18px 50px rgba(0,0,0,.3);overflow:hidden;",
+    "font:13px/1.45 system-ui,-apple-system,sans-serif}",
+    "#pl-ov-in{width:100%;border:0;border-bottom:1px solid #dcdfe4;padding:13px 15px;font:15px system-ui;outline:none}",
+    "#pl-ov-list{max-height:52vh;overflow-y:auto}",
+    ".pl-ov-i{padding:9px 15px;border-bottom:1px solid #eaecef;cursor:pointer;display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}",
+    ".pl-ov-i.sel{background:#e8f0f2}",
+    ".pl-ov-i .nm{font-weight:600;font-size:12.5px}",
+    ".pl-ov-i .tags{margin-left:auto;font-size:10.5px;color:#8d939e;font-family:ui-monospace,Menlo,monospace}",
+    ".pl-ov-i .pv{font-size:11.5px;color:#5b616d;margin-top:2px;display:block;width:100%}",
+    "#pl-ov-foot{padding:8px 15px;font-size:11px;color:#8d939e;background:#f8f9fa;display:flex;gap:14px}",
+    /* ---- confirm / review ------------------------------------------------- */
     "#pl-cf{position:fixed;inset:0;background:rgba(15,17,20,.45);z-index:9700;display:flex;align-items:center;justify-content:center}",
     "#pl-cf-b{background:#fff;width:min(460px,92vw);border-radius:3px;padding:18px;font:13px/1.5 system-ui,-apple-system,sans-serif;box-shadow:0 18px 50px rgba(0,0,0,.3)}",
     "#pl-cf-b h3{margin:0 0 8px;font-size:14px}",
     "#pl-cf-b .ft{margin-top:14px;display:flex;gap:7px;justify-content:flex-end}",
     ".pl-rv-t{width:100%;min-height:190px;font:12px/1.55 ui-monospace,Menlo,monospace;border:1px solid #dcdfe4;padding:9px;margin-top:10px;resize:vertical}",
-    ".pl-lang{display:inline-block;font-size:10px;font-family:ui-monospace,Menlo,monospace;background:#e8f0f2;color:#1f4d5c;padding:1px 5px;border-radius:2px;margin-left:5px}",
-    ".pl-lang.low{background:#fcf3e2;color:#8a5a10}",
-    ".pl-matrix{font-size:11px;color:#8d939e;font-family:ui-monospace,Menlo,monospace;margin-top:5px}",
-    /* toast */
+    /* ---- toast ------------------------------------------------------------ */
     "#pl-toasts{position:fixed;left:14px;bottom:14px;z-index:9600;display:flex;flex-direction:column;gap:6px}",
     ".pl-toast{background:#1f4d5c;color:#fff;padding:7px 12px;border-radius:2px;font:12.5px system-ui;max-width:320px}"
   ].join("");
 
+  /* ================================================================
+   * ui — a left-edge dock of independent buttons.
+   *
+   * Each script owns ONE button. Buttons appear only on the pages where
+   * they apply, carry their own state (a badge, an on/off dot), and open
+   * their output in a popover anchored beside them.
+   *
+   * Why buttons rather than one panel: a panel is a single surface that
+   * every script has to share, so installing one script means accepting
+   * everyone's UI. A button per script keeps them independent — install
+   * three of the seven and you get three buttons.
+   *
+   * Why the left edge: it is the only screen region a dense data table
+   * does not use, so nothing overlaps content the operator is reading.
+   * ================================================================ */
+
   PL.ui = {
-    _sec: {},
-    panel: function () {
-      var p = document.getElementById("pl-panel");
-      if (p) return p;
+    _buttons: {},
+    _openId: null,
+
+    dock: function () {
+      var d = document.getElementById("pl-dock");
+      if (d) return d;
       PL.dom.style("pl-core-css", CSS);
-      p = PL.dom.el("div", { id: "pl-panel" });
-      p.appendChild(PL.dom.el("div", { id: "pl-head" }, [
-        PL.dom.el("b", { text: "Toolkit" }),
+      d = PL.dom.el("div", { id: "pl-dock" });
+      document.body.appendChild(d);
+
+      /* Close the popover on outside click or Escape. */
+      document.addEventListener("mousedown", function (e) {
+        var pop = document.getElementById("pl-pop");
+        if (!pop) return;
+        if (pop.contains(e.target) || e.target.closest("#pl-dock")) return;
+        PL.ui.closePopover();
+      });
+      document.addEventListener("keydown", function (e) {
+        if (e.key === "Escape" && document.getElementById("pl-pop")) PL.ui.closePopover();
+      });
+
+      /* Badges and page-scoping have to track the page, not just navigation.
+         Claiming a case from the pool changes neither the view nor the open
+         case, so a watcher keyed on those would leave a stale count on screen —
+         and a stale count on a button is worse than no count, because it is
+         believed. Debounced so a burst of mutations costs one pass. */
+      var t = null;
+      new MutationObserver(function () {
+        clearTimeout(t);
+        t = setTimeout(function () { PL.ui.refresh(); }, 140);
+      }).observe(document.body, { childList: true, subtree: true, attributes: true });
+
+      return d;
+    },
+
+    /*
+     * spec = {
+     *   id, label,
+     *   pages:   ["case"] | ["queue","pool"] | "*"   which views it shows on
+     *   variant: "warn"                              optional colour
+     *   toggle:  true                                renders an on/off dot
+     *   badge:   function -> string|null             optional count
+     *   render:  function (body) {}                  popover content
+     *   onClick: function () {}                      instead of a popover
+     *   title:   popover heading (defaults to label)
+     * }
+     */
+    button: function (spec) {
+      PL.ui.dock();
+      if (PL.ui._buttons[spec.id]) return PL.ui._buttons[spec.id];
+
+      var el = PL.dom.el("button", { class: "pl-b", "data-pl-button": spec.id, type: "button" });
+      if (spec.toggle) el.appendChild(PL.dom.el("span", { class: "dot" }));
+      el.appendChild(PL.dom.el("span", { class: "lb", text: spec.label }));
+      var badge = PL.dom.el("span", { class: "bd" });
+      badge.style.display = "none";
+      el.appendChild(badge);
+
+      el.addEventListener("click", function () {
+        if (spec.onClick) { spec.onClick(); PL.ui.refresh(); return; }
+        PL.ui.togglePopover(spec);
+      });
+
+      document.getElementById("pl-dock").appendChild(el);
+      var rec = { spec: spec, el: el, badge: badge };
+      PL.ui._buttons[spec.id] = rec;
+      PL.ui.refresh();
+      return rec;
+    },
+
+    /* Visibility + badges are recomputed on every view change rather than
+       cached, because the page decides what applies, not the script. */
+    refresh: function () {
+      var view = PL.adapter.view();
+      Object.keys(PL.ui._buttons).forEach(function (id) {
+        var rec = PL.ui._buttons[id], spec = rec.spec;
+        var applies = spec.pages === "*" || (spec.pages || []).indexOf(view) !== -1;
+        rec.el.style.display = applies ? "" : "none";
+
+        if (!applies) {
+          if (PL.ui._openId === id) PL.ui.closePopover();
+          return;
+        }
+        var b = spec.badge ? spec.badge() : null;
+        rec.badge.textContent = b == null ? "" : String(b);
+        rec.badge.style.display = b == null ? "none" : "";
+        if (spec.variant) rec.el.classList.toggle(spec.variant, true);
+        rec.el.classList.toggle("open", PL.ui._openId === id);
+      });
+
+    },
+
+    /* Deliberately separate from refresh().
+       refresh() runs on every DOM mutation, and re-rendering the open popover
+       that often would destroy whatever the operator is typing into it — the
+       composer and the review gate both hold live text. Content redraws are
+       driven by the scripts, on case change only. */
+    refreshContent: function () {
+      if (!PL.ui._openId) return;
+      var open = PL.ui._buttons[PL.ui._openId];
+      var body = document.getElementById("pl-pop-b");
+      if (open && body && open.spec.render) {
+        PL.ui.clear(body);
+        open.spec.render(body);
+      }
+    },
+
+    setState: function (id, on) {
+      var rec = PL.ui._buttons[id];
+      if (rec) rec.el.classList.toggle("on", !!on);
+    },
+
+    togglePopover: function (spec) {
+      if (PL.ui._openId === spec.id) { PL.ui.closePopover(); return; }
+      PL.ui.closePopover();
+      PL.ui._openId = spec.id;
+
+      var rec = PL.ui._buttons[spec.id];
+      var r = rec.el.getBoundingClientRect();
+
+      var head = PL.dom.el("div", { id: "pl-pop-h" }, [
+        PL.dom.el("b", { text: spec.title || spec.label }),
         PL.dom.el("span", { class: "sp" }),
-        PL.dom.el("button", { title: "Collapse (Alt+\\)", text: "\u203a", onclick: function () { p.classList.toggle("pl-min"); } })
-      ]));
-      p.appendChild(PL.dom.el("div", { id: "pl-body" }));
-      document.body.appendChild(p);
-      PL.hotkeys.bind("alt+\\", function () { p.classList.toggle("pl-min"); });
-      return p;
+        PL.dom.el("span", { class: "r" }),
+        PL.dom.el("button", { text: "\u00d7", title: "Close (Esc)", onclick: function () { PL.ui.closePopover(); } })
+      ]);
+      var body = PL.dom.el("div", { id: "pl-pop-b" });
+      var pop = PL.dom.el("div", { id: "pl-pop" }, [head, body]);
+
+      pop.style.left = (r.right + 8) + "px";
+      pop.style.top = Math.max(8, Math.min(r.top, (global.innerHeight || 800) - 260)) + "px";
+      document.body.appendChild(pop);
+
+      body.setHeaderRight = function (t) { head.querySelector(".r").textContent = t; };
+      if (spec.render) spec.render(body);
+      PL.ui.refresh();
     },
-    section: function (key, title) {
-      PL.ui.panel();
-      if (PL.ui._sec[key]) return PL.ui._sec[key];
-      var body = PL.dom.el("div");
-      var h = PL.dom.el("h4", { text: title });
-      var right = PL.dom.el("span", { class: "r" });
-      h.appendChild(right);
-      var sec = PL.dom.el("div", { class: "pl-sec", "data-pl-section": key }, [h, body]);
-      document.getElementById("pl-body").appendChild(sec);
-      body.setHeaderRight = function (t) { right.textContent = t; };
-      PL.ui._sec[key] = body;
-      return body;
+
+    closePopover: function () {
+      var p = document.getElementById("pl-pop");
+      if (p) p.remove();
+      PL.ui._openId = null;
+      Object.keys(PL.ui._buttons).forEach(function (id) {
+        PL.ui._buttons[id].el.classList.remove("open");
+      });
     },
+
+    /* The body element of the currently open popover, or null. Scripts use
+       this to redraw themselves while the operator is looking at them. */
+    liveBody: function (id) {
+      return PL.ui._openId === id ? document.getElementById("pl-pop-b") : null;
+    },
+
     rows: function (pairs) {
       return pairs.map(function (p) {
         return PL.dom.el("div", { class: "pl-row" }, [
@@ -1100,11 +1262,17 @@
       });
     },
     sub: function (t) { return PL.dom.el("div", { class: "pl-sub", text: t }); },
-    clear: function (n) { while (n.firstChild) n.removeChild(n.firstChild); },
+    clear: function (n) { while (n && n.firstChild) n.removeChild(n.firstChild); },
 
-    /* Blocking yes/no for irreversible steps. Deliberately not window.confirm:
-       the point is to show the operator what has already committed before
-       they authorise something that cannot be taken back. */
+    toast: function (t) {
+      PL.dom.style("pl-core-css", CSS);
+      var stack = document.getElementById("pl-toasts");
+      if (!stack) { stack = PL.dom.el("div", { id: "pl-toasts" }); document.body.appendChild(stack); }
+      var el = PL.dom.el("div", { class: "pl-toast", text: t });
+      stack.appendChild(el);
+      setTimeout(function () { el.remove(); }, 3200);
+    },
+
     confirm: function (title, lines) {
       PL.dom.style("pl-core-css", CSS);
       return new Promise(function (resolve) {
@@ -1126,14 +1294,6 @@
         document.addEventListener("keydown", k, true);
         document.body.appendChild(ov);
       });
-    },
-    toast: function (t) {
-      PL.dom.style("pl-core-css", CSS);
-      var stack = document.getElementById("pl-toasts");
-      if (!stack) { stack = PL.dom.el("div", { id: "pl-toasts" }); document.body.appendChild(stack); }
-      var el = PL.dom.el("div", { class: "pl-toast", text: t });
-      stack.appendChild(el);
-      setTimeout(function () { el.remove(); }, 3200);
     }
   };
 

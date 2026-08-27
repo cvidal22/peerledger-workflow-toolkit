@@ -1,11 +1,11 @@
 // ==UserScript==
 // @name         PeerLedger — Macro Matrix
 // @namespace    https://github.com/cvidal22
-// @version      3.0.0
+// @version      3.1.0
 // @description  Generates the full case-type × action macro grid from one skeleton. Per-party language resolution on outbound messages, single-language internal notes, review gate before every save, marker-verified writes.
 // @author       cvidal22
 // @match        https://cvidal22.github.io/peerledger-workflow-toolkit/*
-// @require      https://cdn.jsdelivr.net/gh/cvidal22/peerledger-workflow-toolkit@main/core/pl-core.js?v=3.0.1
+// @require      https://cdn.jsdelivr.net/gh/cvidal22/peerledger-workflow-toolkit@main/core/pl-core.js?v=3.1.0
 // @grant        none
 // @run-at       document-idle
 // ==/UserScript==
@@ -355,13 +355,20 @@ if (typeof PL === "undefined") return;
 
   /* ---- panel ------------------------------------------------------------ */
 
-  var body = PL.ui.section("matrix", "Macro matrix");
-
   function icon(s) { return { pending: "·", running: "▸", done: "✓", failed: "✕", declined: "–" }[s] || "·"; }
 
+  var lastRun = { log: null, progress: null, result: null, detected: null };
+
   function renderRun(log, progress, result, c, detected) {
+    lastRun = { log: log, progress: progress, result: result, detected: detected };
+    var body = PL.ui.liveBody("matrix");
+    if (!body) { PL.ui.refresh(); return; }
+    draw(body, log, progress, result, c, detected);
+  }
+
+  function draw(body, log, progress, result, c, detected) {
     PL.ui.clear(body);
-    body.setHeaderRight(c ? c.id : "");
+    if (body.setHeaderRight) body.setHeaderRight(c ? c.id : "");
 
     body.appendChild(PL.dom.el("button", { class: "pl-btn", text: "Open matrix (Alt+M)", onclick: openPalette }));
 
@@ -415,6 +422,24 @@ if (typeof PL === "undefined") return;
     }));
   }
 
+  PL.ui.button({
+    id: "matrix",
+    label: "Matrix",
+    title: "Macro matrix",
+    pages: ["case"],
+    badge: function () {
+      return String(Object.keys(CASE_TYPES).length * Object.keys(ACTIONS).length);
+    },
+    render: function (body) {
+      draw(body, lastRun.log, lastRun.progress, lastRun.result, PL.adapter.readCase(), lastRun.detected);
+    }
+  });
+
   PL.hotkeys.bind("alt+m", openPalette);
-  PL.watch(PL.adapter.caseKey, function () { renderRun(null, null, null, PL.adapter.readCase(), null); });
+  PL.watch(PL.adapter.caseKey, function () {
+    lastRun = { log: null, progress: null, result: null, detected: null };
+    PL.ui.refresh();
+    var live = PL.ui.liveBody("matrix");
+    if (live) draw(live, null, null, null, PL.adapter.readCase(), null);
+  });
 })();

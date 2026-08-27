@@ -1,11 +1,11 @@
 // ==UserScript==
 // @name         PeerLedger — Compound Resolution
 // @namespace    https://github.com/cvidal22
-// @version      3.0.0
+// @version      3.1.0
 // @description  Runs a full resolution as one operator gesture: send the user message, record the case note, close the claim. Preflighted, verified between steps, aborts on failure and reports exactly what committed.
 // @author       cvidal22
 // @match        https://cvidal22.github.io/peerledger-workflow-toolkit/*
-// @require      https://cdn.jsdelivr.net/gh/cvidal22/peerledger-workflow-toolkit@main/core/pl-core.js?v=3.0.1
+// @require      https://cdn.jsdelivr.net/gh/cvidal22/peerledger-workflow-toolkit@main/core/pl-core.js?v=3.1.0
 // @grant        none
 // @run-at       document-idle
 // ==/UserScript==
@@ -100,8 +100,9 @@ if (typeof PL === "undefined") return;
   PL.requireCore("3.0.0");
   PL.register("compound-resolution", "3.0.0");
 
-  var body = PL.ui.section("compound", "Compound resolution");
   var lastResult = null;
+  var lastLog = null;
+  var lastProgress = null;
 
   /* ---- the chains -------------------------------------------------- */
 
@@ -252,6 +253,7 @@ if (typeof PL === "undefined") return;
       onProgress: function (log, msg) { render(log, msg, null); }
     }).then(function (res) {
       lastResult = res;
+      lastLog = res.log;
       render(res.log, null, res);
       if (res.ok) PL.ui.toast("Chain complete on " + c.id + ".");
       else PL.ui.toast(res.reason);
@@ -266,6 +268,13 @@ if (typeof PL === "undefined") return;
   }
 
   function render(log, progressMsg, result) {
+    lastLog = log; lastProgress = progressMsg; lastResult = result;
+    var body = PL.ui.liveBody("compound");
+    if (!body) { PL.ui.refresh(); return; }
+    draw(body, log, progressMsg, result);
+  }
+
+  function draw(body, log, progressMsg, result) {
     PL.ui.clear(body);
     var c = PL.adapter.readCase();
 
@@ -273,7 +282,7 @@ if (typeof PL === "undefined") return;
       body.appendChild(PL.dom.el("div", { class: "pl-none", text: "Open a case." }));
       return;
     }
-    body.setHeaderRight(c.id);
+    if (body.setHeaderRight) body.setHeaderRight(c.id);
 
     var closed = PL.dom.qs("#main").getAttribute("data-claim-state") === "closed";
     if (closed && !log) {
@@ -332,5 +341,18 @@ if (typeof PL === "undefined") return;
     PL.hotkeys.bind(ch.key, function () { if (PL.adapter.caseKey()) execute(ch); });
   });
 
-  PL.watch(PL.adapter.caseKey, function () { lastResult = null; render(null, null, null); });
+  PL.ui.button({
+    id: "compound",
+    label: "Resolve + Close",
+    title: "Compound resolution",
+    pages: ["case"],
+    render: function (body) { draw(body, lastLog, lastProgress, lastResult); }
+  });
+
+  PL.watch(PL.adapter.caseKey, function () {
+    lastResult = null; lastLog = null; lastProgress = null;
+    PL.ui.refresh();
+    var live = PL.ui.liveBody("compound");
+    if (live) draw(live, null, null, null);
+  });
 })();

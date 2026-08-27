@@ -18,6 +18,17 @@ load("docs/data.js"); load("docs/app.js"); load("core/pl-core.js");
  "resolution-composer","compound-resolution","macro-matrix"].forEach(s => load(`scripts/${s}.user.js`));
 
 const $ = s => w.document.querySelector(s);
+/* The toolkit is a dock of buttons; content lives in a popover opened from
+   one. These helpers keep the tests reading like operator actions. */
+const openBtn = (w, label) => {
+  const b = [...w.document.querySelectorAll("#pl-dock .pl-b")]
+    .find(x => x.querySelector(".lb").textContent === label);
+  if (!b) throw new Error("no button labelled " + label);
+  b.dispatchEvent(new w.MouseEvent("click", { bubbles: true }));
+  return w.document.getElementById("pl-pop-b");
+};
+const popBody = (w) => w.document.getElementById("pl-pop-b");
+
 const $$ = s => [...w.document.querySelectorAll(s)];
 const click = el => el.dispatchEvent(new w.MouseEvent("click", { bubbles: true }));
 const wait = ms => new Promise(r => setTimeout(r, ms));
@@ -68,8 +79,9 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
   console.log(($("#sent-log .sent") || {}).textContent);
   console.log("\nsaved note rows:", $$("#notes-table tbody tr td.by").length);
   console.log("saved note:", $$("#notes-table tbody tr td:not(.by)").map(t=>t.textContent)[0]);
-  const panel = $('[data-pl-section="matrix"]');
-  console.log("\npanel steps:", $$('[data-pl-section="matrix"] .pl-step').map(s=>s.textContent.trim()));
+  const mb = popBody(w) || openBtn(w, "Matrix");
+  const panel = mb;
+  console.log("\npanel steps:", [...mb.querySelectorAll(".pl-step")].map(s=>s.textContent.trim()));
   console.log("panel tail:", panel.textContent.replace(/\s+/g," ").slice(-160));
 
   console.log("\n=== SPA HELPERS ===");

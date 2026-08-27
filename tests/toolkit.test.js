@@ -18,13 +18,24 @@ load("core/pl-core.js");
   .forEach(s => load(`scripts/${s}.user.js`));
 
 const $ = s => w.document.querySelector(s);
+/* The toolkit is a dock of buttons; content lives in a popover opened from
+   one. These helpers keep the tests reading like operator actions. */
+const openBtn = (w, label) => {
+  const b = [...w.document.querySelectorAll("#pl-dock .pl-b")]
+    .find(x => x.querySelector(".lb").textContent === label);
+  if (!b) throw new Error("no button labelled " + label);
+  b.dispatchEvent(new w.MouseEvent("click", { bubbles: true }));
+  return w.document.getElementById("pl-pop-b");
+};
+const popBody = (w) => w.document.getElementById("pl-pop-b");
+
 const click = el => el.dispatchEvent(new w.MouseEvent("click", { bubbles: true }));
 const wait = ms => new Promise(r => setTimeout(r, ms));
 
 (async () => {
   console.log("VIEW:", w.PL.adapter.view(), "| queue rows:", $("#queue-body").children.length);
-  console.log("panel sections:", [...w.document.querySelectorAll("[data-pl-section]")]
-    .map(s => s.getAttribute("data-pl-section")).join(", "));
+  console.log("dock buttons:", [...w.document.querySelectorAll("#pl-dock .pl-b")]
+    .map(b => b.querySelector(".lb").textContent).join(", "));
 
   // --- open a case
   w.location.hash = "#/claim/PL-204902";
@@ -38,15 +49,15 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
   console.log("evidence:", c.evidence.length, "| chat:", c.chat.length);
 
   console.log("\n=== BRIEF ===");
-  console.log($('[data-pl-section="aggregator"]').textContent.replace(/\s+/g, " ").slice(0, 330));
+  console.log(openBtn(w, "Brief").textContent.replace(/\s+/g, " ").slice(0, 330));
 
   console.log("\n=== FLAGS ===");
-  w.document.querySelectorAll('[data-pl-section="surfacer"] .pl-flag .t')
+  openBtn(w, "Flags").querySelectorAll(".pl-flag .t")
     .forEach(f => console.log("  ·", f.textContent));
 
   // --- composer
   console.log("\n=== COMPOSER (route 2) ===");
-  const comp = $('[data-pl-section="composer"]');
+  const comp = openBtn(w, "Compose");
   click([...comp.querySelectorAll(".pl-btn")].find(b => b.getAttribute("data-route") === "open_recovery"));
   console.log(comp.querySelector("textarea").value.slice(0, 620));
 
@@ -76,7 +87,7 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
   w.location.hash = "#/pool";
   await wait(200);
   console.log("pool rows:", $("#queue-body").children.length);
-  const ac = $('[data-pl-section="autoclaim"]');
+  const ac = openBtn(w, "Auto Claim");
   console.log("state:", ac.textContent.replace(/\s+/g, " ").slice(0, 90));
   click([...ac.querySelectorAll(".pl-btn")][0]);
   console.log("armed:", ac.textContent.replace(/\s+/g, " ").slice(0, 60));

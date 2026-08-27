@@ -227,6 +227,28 @@ Three smaller decisions that came from things going wrong:
 
 ---
 
+## The interface
+
+Seven scripts, seven buttons, docked at the left edge — the one screen region a dense data table never uses.
+
+| Button | Appears on | What it does |
+|---|---|---|
+| **Auto Claim** | queue, pool | Toggle. Badge shows how many cases are waiting. Claims one, then disarms. |
+| **Brief** | case | Assembled case brief. Badge shows evidence count. |
+| **Flags** | case | Policy-pattern matches. Badge shows how many, so you know without opening it. |
+| **Macros** | case | Opens the note-macro palette directly — no popover in the way. |
+| **Compose** | case | Builds the user message and internal note for a chosen route. |
+| **Resolve + Close** | case | Runs the full chain: message, note, close. |
+| **Matrix** | case | The full case-type × action grid. Badge shows the cell count. |
+
+Three deliberate choices:
+
+**A button per script, not one shared panel.** A panel is a single surface every script has to share, so installing one means accepting everyone's UI. With a button each, install three of the seven and you get three buttons.
+
+**Buttons only appear where they apply.** `Auto Claim` is meaningless on a case page and the case buttons are meaningless on the queue, so they aren't rendered there. An open popover closes if its button stops applying.
+
+**Badges are live.** They track the page rather than navigation, because claiming a case from the pool changes neither the view nor the open case — a badge keyed on those would go stale. A stale count on a button is worse than no count, because it gets believed.
+
 ## Try it
 
 1. Install [Tampermonkey](https://www.tampermonkey.net/) (Chrome, Firefox, Edge, Safari).
@@ -240,7 +262,7 @@ Three smaller decisions that came from things going wrong:
    - [Macro Matrix](https://raw.githubusercontent.com/cvidal22/peerledger-workflow-toolkit/main/scripts/macro-matrix.user.js)
 3. Open the **[demo console](https://cvidal22.github.io/peerledger-workflow-toolkit/)**.
 
-Install order doesn't matter — the core loads via `@require`, and every script calls `PL.requireCore()` and refuses to start rather than degrading silently if it's missing. If you upgrade, **remove the old versions first**: two copies of a script bind two listeners and everything fires twice.
+The buttons dock at the left edge and only appear on pages where they apply. Install order doesn't matter — the core loads via `@require`, and every script calls `PL.requireCore()` and refuses to start rather than degrading silently if it's missing. If you upgrade, **remove the old versions first**: two copies of a script bind two listeners and everything fires twice.
 
 **A 60-second tour:** open the unassigned pool (`Alt+P`), arm auto-claim (`Alt+A`), and watch it pull a case. Then open **PL-204902** from your queue — the brief fills, three policy patterns flag. Hit `Alt+K`, type `tpp`, press enter: a macro lands in the note field with the order reference and both handles already filled. Then `Alt+W` composes the recovery route.
 

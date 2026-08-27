@@ -1,11 +1,11 @@
 // ==UserScript==
 // @name         PeerLedger — Macro Launcher
 // @namespace    https://github.com/cvidal22
-// @version      3.0.0
+// @version      3.1.0
 // @description  Keyboard-invoked searchable macro palette. Fills templates from live case data and inserts into the note field. Refuses to insert anything it could not fully resolve.
 // @author       cvidal22
 // @match        https://cvidal22.github.io/peerledger-workflow-toolkit/*
-// @require      https://cdn.jsdelivr.net/gh/cvidal22/peerledger-workflow-toolkit@main/core/pl-core.js?v=3.0.1
+// @require      https://cdn.jsdelivr.net/gh/cvidal22/peerledger-workflow-toolkit@main/core/pl-core.js?v=3.1.0
 // @grant        none
 // @run-at       document-idle
 // ==/UserScript==
@@ -241,15 +241,15 @@ if (typeof PL === "undefined") return;
 
   PL.hotkeys.bind("alt+k", open);
 
-  var body = PL.ui.section("macros", "Macro launcher");
-  body.appendChild(PL.dom.el("button", { class: "pl-btn", text: "Open palette", onclick: open }));
-  body.appendChild(PL.dom.el("div", {
-    class: "pl-hint",
-    text: "Alt+K anywhere, including while typing in the note field. " +
-      MACROS.length + " macros, all filled from the open case."
-  }));
-  body.appendChild(PL.dom.el("div", {
-    class: "pl-hint",
-    text: "A macro that can't be fully resolved refuses to insert rather than leaving a gap."
-  }));
+  PL.ui.button({
+    id: "macros",
+    label: "Macros",
+    pages: ["case"],
+    /* No popover: this button IS the action. A palette that needed two
+       clicks to open would be slower than the dropdown it replaces. */
+    onClick: open,
+    badge: function () { return String(PL.registry.group("Note macros").length); }
+  });
+
+  PL.watch(PL.adapter.caseKey, function () { PL.ui.refresh(); });
 })();

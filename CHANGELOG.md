@@ -2,6 +2,17 @@
 
 Grouped by script, because installs happen one script at a time.
 
+## 3.1.0
+
+**core/pl-core.js (ui)** — replaced the shared docked panel with a left-edge dock of independent buttons. Each script owns one button, scoped to the pages where it applies, with its own badge and popover.
+- `PL.ui.button` / `refresh` / `refreshContent` / `setState` / `liveBody` replace `PL.ui.section`
+- Badge refresh is driven by a debounced DOM observer, not by navigation. Claiming a case from the pool changes neither the view nor the open case, so a navigation-keyed badge went stale
+- Content redraw separated from badge refresh so an open popover holding typed text is not wiped
+
+**All scripts** — converted from panel sections to buttons.
+
+**tests/buttons.test.js** — new. Page scoping, badge liveness, popover lifecycle.
+
 ## 3.0.0
 
 **core/pl-core.js**

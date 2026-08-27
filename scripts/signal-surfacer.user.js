@@ -1,11 +1,11 @@
 // ==UserScript==
 // @name         PeerLedger — Signal Surfacer
 // @namespace    https://github.com/cvidal22
-// @version      3.0.0
+// @version      3.1.0
 // @description  Scans the trade transcript and claim statement for known policy-violation patterns and surfaces the matching lines for human review. Flags, never decides.
 // @author       cvidal22
 // @match        https://cvidal22.github.io/peerledger-workflow-toolkit/*
-// @require      https://cdn.jsdelivr.net/gh/cvidal22/peerledger-workflow-toolkit@main/core/pl-core.js?v=3.0.1
+// @require      https://cdn.jsdelivr.net/gh/cvidal22/peerledger-workflow-toolkit@main/core/pl-core.js?v=3.1.0
 // @grant        none
 // @run-at       document-idle
 // ==/UserScript==
@@ -116,7 +116,6 @@ if (typeof PL === "undefined") return;
     }
   ];
 
-  var body = PL.ui.section("surfacer", "Flagged lines");
 
   function scan(c) {
     var hits = [];
@@ -133,12 +132,18 @@ if (typeof PL === "undefined") return;
     return hits;
   }
 
-  function render(c) {
+  function hitCount() {
+    var c = PL.adapter.readCase();
+    return c ? scan(c).length : 0;
+  }
+
+  function render(body) {
+    var c = PL.adapter.readCase();
     PL.ui.clear(body);
     if (!c) { body.appendChild(PL.dom.el("div", { class: "pl-none", text: "Open a case." })); return; }
 
     var hits = scan(c);
-    body.setHeaderRight(hits.length ? hits.length + " flagged" : "clear");
+    if (body.setHeaderRight) body.setHeaderRight(hits.length ? hits.length + " flagged" : "clear");
 
     if (!hits.length) {
       body.appendChild(PL.dom.el("div", {
@@ -169,5 +174,21 @@ if (typeof PL === "undefined") return;
     PL.log("surfacer", hits.length + " hits on " + c.id);
   }
 
-  PL.watch(PL.adapter.caseKey, function () { render(PL.adapter.readCase()); });
+  PL.ui.button({
+    id: "surfacer",
+    label: "Flags",
+    title: "Flagged lines",
+    pages: ["case"],
+    variant: "warn",
+    /* The badge is the whole point of this script being a button: the
+       operator sees there is something to read without opening anything. */
+    badge: function () { var n = hitCount(); return n ? String(n) : null; },
+    render: render
+  });
+
+  PL.watch(PL.adapter.caseKey, function () {
+    PL.ui.refresh();
+    var live = PL.ui.liveBody("surfacer");
+    if (live) render(live);
+  });
 })();

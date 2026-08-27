@@ -20,6 +20,25 @@ Host presentation conventions are resolved at this boundary too. A UI that rende
 
 ---
 
+## Contract 0 — one button per script
+
+```javascript
+PL.ui.button({
+  id: "surfacer",
+  label: "Flags",
+  pages: ["case"],          // views this button applies to, or "*"
+  variant: "warn",          // optional colour
+  toggle: true,             // renders an on/off dot
+  badge: () => count || null,
+  render: (body) => {},     // popover contents
+  onClick: () => {}         // instead of a popover
+});
+```
+
+`PL.ui.refresh()` recomputes visibility and badges; it runs on every DOM mutation, debounced. `PL.ui.refreshContent()` redraws an open popover and is deliberately *not* called by `refresh` — the composer and review gate hold live text a redraw would destroy. Scripts drive content redraws themselves, on case change.
+
+`PL.ui.liveBody(id)` returns the popover body if that button's popover is open, or null.
+
 ## Contract 1 — the registry
 
 Scripts publish entries; the launcher renders whatever it finds. Adding a macro touches one file.
@@ -134,7 +153,7 @@ __PL_INSTANCES__   // { "macro-matrix": ["3.0.0"] } is healthy
 scripts/         consume Case and QueueRow objects. Zero selectors.
   ↓
 core/pl-core.js
-  ui        one docked panel, shared sections
+  ui        left-edge button dock; one button per script, popover output
   overlay   keyboard-first filter palette
   hotkeys   one listener for the whole toolkit
   registry  scripts publish, launcher renders

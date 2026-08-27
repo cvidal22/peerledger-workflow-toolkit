@@ -1,11 +1,11 @@
 // ==UserScript==
 // @name         PeerLedger — Queue Auto-Claim
 // @namespace    https://github.com/cvidal22
-// @version      3.0.0
+// @version      3.1.0
 // @description  Watches the unassigned pool and claims the next case automatically, so the operator is never sitting on a refresh button between cases.
 // @author       cvidal22
 // @match        https://cvidal22.github.io/peerledger-workflow-toolkit/*
-// @require      https://cdn.jsdelivr.net/gh/cvidal22/peerledger-workflow-toolkit@main/core/pl-core.js?v=3.0.1
+// @require      https://cdn.jsdelivr.net/gh/cvidal22/peerledger-workflow-toolkit@main/core/pl-core.js?v=3.1.0
 // @grant        none
 // @run-at       document-idle
 // ==/UserScript==
@@ -86,7 +86,6 @@ if (typeof PL === "undefined") return;
 
   var poller = null;
   var armed = false;
-  var body = PL.ui.section("autoclaim", "Auto-claim");
 
   function onPool() { return PL.adapter.view() === "pool"; }
 
@@ -125,21 +124,27 @@ if (typeof PL === "undefined") return;
       giveUpAfter: 12,
       onStop: function (reason) {
         armed = false;
+        PL.ui.setState("autoclaim", false);
         if (reason === "idle") PL.ui.toast("Auto-claim stopped — pool stayed empty.");
-        render();
+        var lb = PL.ui.liveBody("autoclaim");
+        if (lb) render(lb);
       }
     }).start();
-    render();
+    PL.ui.setState("autoclaim", true);
+    var live = PL.ui.liveBody("autoclaim");
+    if (live) render(live);
   }
 
   function disarm(reason) {
     PL.exclusive.release("auto-claim");
     if (poller) poller.stop(reason);
     armed = false;
-    render();
+    PL.ui.setState("autoclaim", false);
+    var live = PL.ui.liveBody("autoclaim");
+    if (live) render(live);
   }
 
-  function render() {
+  function render(body) {
     PL.ui.clear(body);
 
     body.appendChild(PL.dom.el("div", {}, [
@@ -173,8 +178,26 @@ if (typeof PL === "undefined") return;
     }));
   }
 
+  PL.ui.button({
+    id: "autoclaim",
+    label: "Auto Claim",
+    title: "Auto-claim",
+    pages: ["pool", "queue", "escalations", "closed"],
+    toggle: true,
+    badge: function () {
+      if (PL.adapter.view() !== "pool") return null;
+      var n = PL.adapter.readQueue().filter(function (r) { return r.claimButton; }).length;
+      return n ? String(n) : null;
+    },
+    render: render
+  });
+
   PL.hotkeys.bind("alt+a", function () { armed ? disarm("manual") : arm(); });
   PL.hotkeys.bind("alt+p", function () { location.hash = "#/pool"; });
 
-  PL.watch(function () { return PL.adapter.view() + ":" + (PL.adapter.caseKey() || ""); }, render);
+  PL.watch(function () { return PL.adapter.view() + ":" + (PL.adapter.caseKey() || ""); }, function () {
+    PL.ui.refresh();
+    var live = PL.ui.liveBody("autoclaim");
+    if (live) render(live);
+  });
 })();
