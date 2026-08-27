@@ -18,7 +18,11 @@ const SCRIPTS = path.join(ROOT, "scripts");
 const CORE = path.join(ROOT, "core", "pl-core.js");
 
 const HOST = "https://cvidal22.github.io/peerledger-workflow-toolkit/*";
-const REQUIRE_BASE = "https://cdn.jsdelivr.net/gh/cvidal22/peerledger-workflow-toolkit@main/core/pl-core.js";
+/* raw.githubusercontent, deliberately not a CDN: jsDelivr caches branch URLs
+   for up to 12 hours and ignores the query string, so a version buster does
+   nothing there and an updated core silently serves stale. */
+const REQUIRE_BASE = "https://raw.githubusercontent.com/cvidal22/peerledger-workflow-toolkit/main/core/pl-core.js";
+const BANNED_HOST = "cdn.jsdelivr.net";
 
 let failures = [];
 const fail = (file, msg) => failures.push(`${path.basename(file)}: ${msg}`);
@@ -81,6 +85,7 @@ files.forEach(file => {
 
   /* 6. Every script requires the same core build. */
   if (!m.require) fail(file, "missing @require for pl-core");
+  else if (m.require[0].indexOf(BANNED_HOST) !== -1) fail(file, "@require uses jsDelivr, which ignores the ?v= buster on branch URLs");
   else if (!m.require[0].startsWith(REQUIRE_BASE)) fail(file, "@require does not point at core/pl-core.js on main");
   /* The version query is what forces a re-fetch when the core changes. Without
      it the extension and the CDN both serve a cached build and the scripts

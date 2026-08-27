@@ -1,11 +1,11 @@
 // ==UserScript==
 // @name         PeerLedger — Macro Launcher
 // @namespace    https://github.com/cvidal22
-// @version      3.1.1
+// @version      3.1.2
 // @description  Keyboard-invoked searchable macro palette. Fills templates from live case data and inserts into the note field. Refuses to insert anything it could not fully resolve.
 // @author       cvidal22
 // @match        https://cvidal22.github.io/peerledger-workflow-toolkit/*
-// @require      https://cdn.jsdelivr.net/gh/cvidal22/peerledger-workflow-toolkit@main/core/pl-core.js?v=3.1.1
+// @require      https://raw.githubusercontent.com/cvidal22/peerledger-workflow-toolkit/main/core/pl-core.js?v=3.1.2
 // @grant        none
 // @run-at       document-idle
 // ==/UserScript==
@@ -55,13 +55,16 @@
 /* ---------------------------------------------------------------------------
  * Bootstrap check.
  *
- * @require content is cached by the extension AND by the CDN. A stale or
- * failed fetch leaves PL undefined or out of date, and a bare throw here
- * dies in the console where nobody is looking — the operator just sees a
- * toolkit that stopped existing.
+ * @require content is cached by the extension, and by whatever serves it.
+ * A stale or failed fetch leaves PL out of date, and a bare throw here dies
+ * in the console where nobody is looking — the operator just sees a toolkit
+ * that stopped existing.
  *
- * The version is pinned in the @require URL so a core update forces a
- * re-fetch instead of silently serving the old build.
+ * The URL points at raw.githubusercontent, NOT a CDN. jsDelivr caches a
+ * branch URL for up to 12 hours and ignores query strings, so a "?v=" buster
+ * busts nothing there: an updated core keeps serving stale for half a day
+ * while no button ever appears. Raw honours the query and caches for five
+ * minutes.
  * ------------------------------------------------------------------------- */
 (function () {
   /* Checking for PL alone is not enough: a cached older core defines PL,
@@ -82,7 +85,7 @@
 if (typeof PL === "undefined" || !PL.ui || !PL.ui.button) return;
 
   if (!PL.guard("macro-launcher")) return;
-  PL.requireCore("3.1.1");
+  PL.requireCore("3.1.2");
   PL.register("macro-launcher", "3.0.0");
 
   var MACROS = [

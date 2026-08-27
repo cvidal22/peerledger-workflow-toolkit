@@ -5,7 +5,7 @@ Symptom first, because that is what you have when something goes wrong.
 | Symptom | Cause | Fix |
 |---|---|---|
 | Every action fires twice | Two copies of the script installed | Remove the stale copy. Check `__PL_INSTANCES__` in the console — more than one version listed means a duplicate is live. |
-| Panel never appears | The core failed to load, or jsDelivr hasn't picked up a fresh commit | Wait ~10 minutes after pushing and reload. Check the console for the `PL.requireCore` error. |
+| Buttons never appear, red banner naming an old version | A cached copy of `pl-core.js` is being served | The banner tells you which version arrived. Remove and reinstall the scripts. If it persists, see *Stale core* below. |
 | Panel appears twice | Same as double-firing | As above. |
 | Messages go out in English | Language layer unavailable when the macro ran | `PL.requireCore` should have thrown — check the console. Never let a macro degrade silently. |
 | Macro clicks the wrong thing | Text lookup matched a hidden navigation element | Use `PL.spa.byText`, which filters for visibility. |
@@ -27,3 +27,21 @@ Append a scenario to the demo URL rather than waiting for the failure to happen 
 `?scenario=slow` · `noop` · `concurrent` · `throttle` · `stale` · `twins` · `menus` — combinable with commas.
 
 `tests/scenarios.test.js` asserts the scripts survive each one, and shows the naive approach failing alongside the correct one.
+
+
+## Stale core
+
+The banner reads `pl-core.js is missing or out of date (found X)`. The scripts fetched an older core than they need.
+
+**Why it happens.** `@require` content is cached twice: by the extension, and by whatever serves the file.
+
+`raw.githubusercontent.com` caches for about five minutes and honours a `?v=` query, so bumping the version in the URL forces a fresh fetch. **jsDelivr does not** — a `@branch` URL is cached for up to 12 hours and the query string is ignored, so a version buster busts nothing and an updated core serves stale for half a day. That is why the `@require` here points at raw, and why `build/validate.js` fails the build if anyone switches it back.
+
+**To fix it now:**
+
+1. Remove all the scripts in the Tampermonkey dashboard (not just disable).
+2. Reload the extensions page, then reinstall from the README links.
+3. If the banner still names the old version, open the `@require` URL directly in a tab and check the `PL.version` line near the top. If that file is current, the extension is holding the cache — reinstall once more.
+
+**If you must use a CDN**, purge it explicitly after each push rather than relying on a query string:
+`https://purge.jsdelivr.net/gh/<user>/<repo>@main/core/pl-core.js`

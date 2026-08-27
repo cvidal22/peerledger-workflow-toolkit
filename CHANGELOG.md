@@ -2,6 +2,10 @@
 
 Grouped by script, because installs happen one script at a time.
 
+## 3.1.2
+
+**All scripts** — `@require` moved from jsDelivr to `raw.githubusercontent.com`. jsDelivr caches a branch URL for up to 12 hours and **ignores query strings**, so the `?v=` cache-buster added in 3.1.1 did nothing: an updated core kept serving stale and no button ever appeared. Raw caches for five minutes and honours the query. `build/validate.js` now fails the build if a script points at a CDN host.
+
 ## 3.1.1
 
 **All scripts** — fixed: `requireCore("3.0.0")` while using APIs introduced in 3.1.0. A cached older core passed the check and then died on the first call to a method it did not have, in the console, with no button and no explanation. This is exactly the failure `requireCore` exists to prevent.

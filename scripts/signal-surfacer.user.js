@@ -1,11 +1,11 @@
 // ==UserScript==
 // @name         PeerLedger — Signal Surfacer
 // @namespace    https://github.com/cvidal22
-// @version      3.1.1
+// @version      3.1.2
 // @description  Scans the trade transcript and claim statement for known policy-violation patterns and surfaces the matching lines for human review. Flags, never decides.
 // @author       cvidal22
 // @match        https://cvidal22.github.io/peerledger-workflow-toolkit/*
-// @require      https://cdn.jsdelivr.net/gh/cvidal22/peerledger-workflow-toolkit@main/core/pl-core.js?v=3.1.1
+// @require      https://raw.githubusercontent.com/cvidal22/peerledger-workflow-toolkit/main/core/pl-core.js?v=3.1.2
 // @grant        none
 // @run-at       document-idle
 // ==/UserScript==
@@ -58,13 +58,16 @@
 /* ---------------------------------------------------------------------------
  * Bootstrap check.
  *
- * @require content is cached by the extension AND by the CDN. A stale or
- * failed fetch leaves PL undefined or out of date, and a bare throw here
- * dies in the console where nobody is looking — the operator just sees a
- * toolkit that stopped existing.
+ * @require content is cached by the extension, and by whatever serves it.
+ * A stale or failed fetch leaves PL out of date, and a bare throw here dies
+ * in the console where nobody is looking — the operator just sees a toolkit
+ * that stopped existing.
  *
- * The version is pinned in the @require URL so a core update forces a
- * re-fetch instead of silently serving the old build.
+ * The URL points at raw.githubusercontent, NOT a CDN. jsDelivr caches a
+ * branch URL for up to 12 hours and ignores query strings, so a "?v=" buster
+ * busts nothing there: an updated core keeps serving stale for half a day
+ * while no button ever appears. Raw honours the query and caches for five
+ * minutes.
  * ------------------------------------------------------------------------- */
 (function () {
   /* Checking for PL alone is not enough: a cached older core defines PL,
@@ -85,7 +88,7 @@
 if (typeof PL === "undefined" || !PL.ui || !PL.ui.button) return;
 
   if (!PL.guard("signal-surfacer")) return;
-  PL.requireCore("3.1.1");
+  PL.requireCore("3.1.2");
   PL.register("signal-surfacer", "3.0.0");
 
   var PATTERNS = [
