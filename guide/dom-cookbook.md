@@ -197,3 +197,45 @@ Check for stale copies with `__PL_INSTANCES__` in the console.
 **Cause:** the app keeps several rendered views alive in the DOM at once.
 
 **Fix:** anchor table selection to **content** — the table containing the record you queried — never to `nth-of-type` or document order.
+
+---
+
+## Capturing a fixture without leaking anything
+
+**Symptom:** none, until it's permanent. A DOM dump committed to git is there forever, and `git rm` doesn't remove it from history.
+
+**Cause:** `document.body.outerHTML` captures everything — including things invisible on screen. The worst offender is a watermark node that repeats the operator's email dozens of times at near-zero opacity. You cannot see it. It is fully present in the markup.
+
+**Fix:** never commit a raw capture. Run it through [`build/scrub-fixture.py`](../build/scrub-fixture.py) first, which removes the watermark node, replaces emails with stable synthetic ones, masks long identifiers, blanks user-authored free text, and empties notification payloads.
+
+```bash
+python3 build/scrub-fixture.py raw.html --report        # see what it would do
+python3 build/scrub-fixture.py raw.html > tests/fixtures/case-detail.html
+```
+
+It **exits non-zero** if anything email-shaped or identifier-shaped survives. Treat that as *do not commit*, not as a warning.
+
+Set `FORBIDDEN_TOKENS` at the top to your organisation's domain and internal host names before first use.
+
+A fixture is only useful for its structure. Nothing in it needs to survive.
+
+---
+
+## Building something worth testing against
+
+**Symptom:** the automation passes every test and still breaks in production, intermittently, in ways nobody can reproduce.
+
+**Cause:** the test target is well-behaved and the real application is not. A clean, synchronous mock gives false confidence — it exercises the happy path and nothing else.
+
+**Fix:** make the mock *misbehave like the original*. Looking similar is worthless; failing similarly is the entire point. Every entry in this cookbook exists because a real platform does something awkward, so a mock that does none of them tests nothing.
+
+In this repository those behaviours are switches — see `docs/scenarios.js` and the scenario table in the README. Turning them on individually is what converts "the macro fails sometimes" into a test case with a name.
+
+Worth reproducing deliberately, in rough order of how much they'll cost you:
+
+1. Data arriving after the skeleton renders
+2. A click that is silently swallowed
+3. A concurrent write from another operator
+4. Timers throttled in a background tab
+5. A stale view left mounted by a keep-alive cache
+6. Hidden elements whose text duplicates on-page controls

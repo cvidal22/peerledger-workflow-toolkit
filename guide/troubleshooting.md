@@ -19,3 +19,11 @@ Symptom first, because that is what you have when something goes wrong.
 | Palette shows duplicate entries | Same entry published twice | Registry de-duplicates on `channel` + `id`; check they're unique. |
 | Demo page 404s | Pages source set to `/root` | Settings → Pages → folder `/docs`. |
 | Demo loads unstyled | `docs/styles.css` missing | Re-upload it. |
+
+## Reproducing a bug
+
+Append a scenario to the demo URL rather than waiting for the failure to happen again:
+
+`?scenario=slow` · `noop` · `concurrent` · `throttle` · `stale` · `twins` · `menus` — combinable with commas.
+
+`tests/scenarios.test.js` asserts the scripts survive each one, and shows the naive approach failing alongside the correct one.

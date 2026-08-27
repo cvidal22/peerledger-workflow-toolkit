@@ -124,14 +124,49 @@ Three things in the skeleton worth reading:
 
 ---
 
+## The demo console misbehaves on purpose
+
+A clean mock is a bad test target. Automation that only runs against a synchronous, single-rendered, well-behaved page looks correct right up until it meets a real application — and then fails intermittently, in ways almost impossible to reproduce.
+
+So the failure modes are switches on the URL:
+
+| Scenario | What it does |
+|---|---|
+| [`?scenario=slow`](https://cvidal22.github.io/peerledger-workflow-toolkit/?scenario=slow) | Fields render as `--` and populate after a delay |
+| [`?scenario=noop`](https://cvidal22.github.io/peerledger-workflow-toolkit/?scenario=noop) | The first save on a case is silently swallowed |
+| [`?scenario=concurrent`](https://cvidal22.github.io/peerledger-workflow-toolkit/?scenario=concurrent) | A colleague writes to the case at the same instant you do |
+| [`?scenario=throttle`](https://cvidal22.github.io/peerledger-workflow-toolkit/?scenario=throttle) | Timers clamped to one tick a minute, as in a background tab |
+| [`?scenario=stale`](https://cvidal22.github.io/peerledger-workflow-toolkit/?scenario=stale) | The previous view stays mounted, so two tables exist at once |
+| [`?scenario=twins`](https://cvidal22.github.io/peerledger-workflow-toolkit/?scenario=twins) | Collapsed sidebar entries duplicate on-page button labels |
+| [`?scenario=menus`](https://cvidal22.github.io/peerledger-workflow-toolkit/?scenario=menus) | Menus render into `<body>`; several can be open at once |
+
+Combine them: `?scenario=slow,concurrent`.
+
+`tests/scenarios.test.js` runs the scripts against each one. The `concurrent` case is the clearest single argument in the repository:
+
+```
+scenario=concurrent
+  ok    two writes landed, not one — 1 -> 3
+  ok    row-count check would have passed on either write
+  ok    marker finds MY write specifically
+  ok    marker does not match a write I never made
+```
+
+That is the difference between verification that looks right and verification that is right — and it only shows up on a page willing to misbehave.
+
+Writing the `twins` scenario also found a real bug in `PL.spa.visible`: it checked the element's own computed style but not its ancestors, so a button inside a collapsed container read as visible. In a browser `offsetParent === null` hides that mistake; the helper was leaning on layout it shouldn't need. It now walks ancestors, which is correct with or without a layout engine. **The scenario existed for about ten minutes before it caught something.**
+
+---
+
 ## Repository layout
 
 ```
 core/pl-core.js      the shared runtime — every script depends on this and nothing else
 scripts/             seven userscripts, each one file
-docs/                the demo console (GitHub Pages root)
+docs/                the demo console (GitHub Pages root) — including scenarios.js
 guide/               ARCHITECTURE · dom-cookbook · adding-a-macro · troubleshooting
 build/validate.js    syntax + metadata gate
+build/scrub-fixture.py  strips identifying data from a captured DOM before it becomes a fixture
 tests/               jsdom harness driving the real demo page
 .github/workflows/   CI: validate, then run the tests
 ```

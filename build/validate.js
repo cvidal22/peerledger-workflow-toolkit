@@ -18,7 +18,7 @@ const SCRIPTS = path.join(ROOT, "scripts");
 const CORE = path.join(ROOT, "core", "pl-core.js");
 
 const HOST = "https://cvidal22.github.io/peerledger-workflow-toolkit/*";
-const REQUIRE_URL = "https://cdn.jsdelivr.net/gh/cvidal22/peerledger-workflow-toolkit@main/core/pl-core.js";
+const REQUIRE_BASE = "https://cdn.jsdelivr.net/gh/cvidal22/peerledger-workflow-toolkit@main/core/pl-core.js";
 
 let failures = [];
 const fail = (file, msg) => failures.push(`${path.basename(file)}: ${msg}`);
@@ -81,7 +81,15 @@ files.forEach(file => {
 
   /* 6. Every script requires the same core build. */
   if (!m.require) fail(file, "missing @require for pl-core");
-  else if (m.require[0] !== REQUIRE_URL) fail(file, "@require does not point at core/pl-core.js on main");
+  else if (!m.require[0].startsWith(REQUIRE_BASE)) fail(file, "@require does not point at core/pl-core.js on main");
+  /* The version query is what forces a re-fetch when the core changes. Without
+     it the extension and the CDN both serve a cached build and the scripts
+     die on requireCore with nothing visible on the page. */
+  else if (!/\?v=\d+\.\d+\.\d+$/.test(m.require[0])) fail(file, "@require is missing the ?v=x.y.z cache-buster");
+
+  /* 7b. Visible bootstrap failure. A console-only throw is invisible to the
+        person actually using the toolkit. */
+  if (!/pl-boot-error/.test(src)) fail(file, "no visible bootstrap failure banner");
 
   /* 7. Duplicate-install guard. Without it two installed copies bind two
         listeners and every action fires twice. */

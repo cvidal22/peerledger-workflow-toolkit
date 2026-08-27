@@ -3,7 +3,7 @@
  * Invented platform, invented users, invented orders.
  */
 
-window.PEERLEDGER_STATE = { agent: "a.moreira", shift: "09:00-18:00", target: 80 };
+window.PEERLEDGER_STATE = { agent: "c.vidal", shift: "09:00-18:00", target: 80 };
 
 window.PEERLEDGER_CLAIMS = [
   {
@@ -369,3 +369,68 @@ window.PEERLEDGER_CLAIMS = [
   }
 
 ];
+
+/* ---------------------------------------------------------------------------
+ * Enrichment.
+ *
+ * Fields every claim needs but which don't vary interestingly per claim are
+ * derived here rather than repeated ten times above: response deadlines,
+ * evidence review state, counterparty history and the case event log.
+ * ------------------------------------------------------------------------- */
+(function () {
+  var NOW = new Date("2026-08-26T17:00:00");
+
+  function plus(hours) {
+    return new Date(NOW.getTime() + hours * 3600000).toISOString();
+  }
+
+  var OUTCOMES = ["upheld", "not upheld", "withdrawn", "recovered"];
+
+  window.PEERLEDGER_CLAIMS.forEach(function (c, idx) {
+    /* Response deadline. Some are already tight, one is expired, so the
+       queue shows a realistic spread rather than all-green. */
+    var offsets = [3.5, -0.75, 9, 1.25, 5, 11, 2, 8, 0.5, 6];
+    c.deadline = plus(offsets[idx % offsets.length]);
+    c.deadlineSetBy = idx % 3 === 0 ? "system" : "c.vidal";
+
+    /* Evidence carries submission and review state — "three files attached"
+       is not the same fact as "two reviewed, one rejected as irrelevant". */
+    c.evidence.forEach(function (e, i) {
+      e.submittedBy = i === 0 ? c.filedBy : (i % 2 ? c.filedBy : (c.filedBy === "seller" ? "buyer" : "seller"));
+      e.submittedAt = c.openedAt;
+      e.status = e.tag === "Irrelevant" ? "rejected" : (i === 0 ? "accepted" : "pending");
+      e.sizeKb = 120 + ((idx * 37 + i * 53) % 900);
+    });
+
+    /* Counterparty history — prior disputes with outcomes, not just a count. */
+    ["seller", "buyer"].forEach(function (role) {
+      var p = c.parties[role];
+      p.history = [];
+      for (var i = 0; i < Math.min(p.disputes, 4); i++) {
+        p.history.push({
+          ref: "PL-" + (198000 + ((idx * 91 + i * 37) % 6000)),
+          outcome: OUTCOMES[(idx + i + (role === "buyer" ? 1 : 0)) % OUTCOMES.length],
+          when: "2026-0" + (3 + ((idx + i) % 5)) + "-1" + ((i * 3) % 9)
+        });
+      }
+      p.flags = [];
+      if (p.disputes >= 5) p.flags.push("elevated dispute rate");
+      if (/^\d+d$|^\dm$/.test(p.tenure) || p.tenure.indexOf("d") > -1) p.flags.push("new account");
+      if (p.orders > 2000) p.flags.push("high volume merchant");
+    });
+
+    /* Workflow state. */
+    c.stage = "review";            // review → recovery → audit → closed
+    c.recovery = null;             // { ref, amount, status, openedAt, settledAt }
+    c.escalated = false;
+    c.audit = null;                // { status, by, at }
+    c.sent = c.sent || [];
+
+    c.events = [
+      { at: c.openedAt, by: "system", text: "Claim created from complainant submission." }
+    ];
+    c.notes.forEach(function (n) {
+      c.events.push({ at: n.at, by: n.by, text: "Note recorded." });
+    });
+  });
+})();

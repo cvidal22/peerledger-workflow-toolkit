@@ -5,7 +5,7 @@
 // @description  Collapses order state, counterparty asymmetry and evidence inventory into one always-visible brief, so the decision starts from a single view.
 // @author       cvidal22
 // @match        https://cvidal22.github.io/peerledger-workflow-toolkit/*
-// @require      https://cdn.jsdelivr.net/gh/cvidal22/peerledger-workflow-toolkit@main/core/pl-core.js
+// @require      https://cdn.jsdelivr.net/gh/cvidal22/peerledger-workflow-toolkit@main/core/pl-core.js?v=3.0.1
 // @grant        none
 // @run-at       document-idle
 // ==/UserScript==
@@ -40,6 +40,30 @@
 
 (function () {
   "use strict";
+
+/* ---------------------------------------------------------------------------
+ * Bootstrap check.
+ *
+ * @require content is cached by the extension AND by the CDN. A stale or
+ * failed fetch leaves PL undefined or out of date, and a bare throw here
+ * dies in the console where nobody is looking — the operator just sees a
+ * toolkit that stopped existing.
+ *
+ * The version is pinned in the @require URL so a core update forces a
+ * re-fetch instead of silently serving the old build.
+ * ------------------------------------------------------------------------- */
+(function () {
+  if (typeof PL !== "undefined" && PL.requireCore) return;
+  if (document.getElementById("pl-boot-error")) return;
+  var b = document.createElement("div");
+  b.id = "pl-boot-error";
+  b.textContent = "PeerLedger toolkit: pl-core.js did not load. " +
+    "Reinstall the scripts, or wait a few minutes if the repository was just updated.";
+  b.style.cssText = "position:fixed;top:0;left:0;right:0;z-index:99999;background:#8f2f2c;" +
+    "color:#fff;padding:9px 14px;font:13px system-ui,sans-serif;text-align:center";
+  (document.body || document.documentElement).appendChild(b);
+})();
+if (typeof PL === "undefined") return;
 
   if (!PL.guard("context-aggregator")) return;
   PL.requireCore("3.0.0");

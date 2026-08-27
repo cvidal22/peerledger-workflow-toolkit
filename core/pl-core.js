@@ -17,7 +17,7 @@
 (function (global) {
   "use strict";
 
-  var PL = { version: "3.0.0" };
+  var PL = { version: "3.0.1" };
 
   /* ================================================================
    * dom
@@ -551,31 +551,33 @@
        clicking a menu item instead of a button. */
     visible: function (el) {
       if (!el || el.disabled) return false;
-      if (el.hidden || (el.closest && el.closest("[hidden]"))) return false;
 
-      var cs = global.getComputedStyle ? global.getComputedStyle(el) : null;
-      if (cs && (cs.display === "none" || cs.visibility === "hidden")) return false;
-
-      /* offsetParent === null is the cheap visibility test and it is correct
-         for ordinary flow content. It is WRONG for position:fixed elements,
-         which report null while being plainly on screen — so injected panels
-         and teleported menus need the computed-style path above plus a size
-         check instead. Using offsetParent alone is why injected UI sometimes
-         looks invisible to its own script. */
-      if (cs && cs.position === "fixed") {
-        var fr = el.getBoundingClientRect ? el.getBoundingClientRect() : null;
-        return !fr || fr.width > 0 || fr.height > 0;
-      }
-      if ("offsetParent" in el && el.offsetParent === null && cs && cs.position !== "fixed") {
-        /* jsdom does not implement layout, so fall through rather than
-           reporting everything invisible under test. */
-        if (typeof el.getBoundingClientRect !== "function") return false;
-        var r = el.getBoundingClientRect();
-        if (r.width === 0 && r.height === 0 && cs.position !== "fixed") {
-          return !!(el.ownerDocument && el.ownerDocument.defaultView &&
-                    !el.ownerDocument.defaultView.navigator.userAgent.match(/jsdom/i))
-            ? false : true;
+      /* Walk ancestors. An element can be display:inline-block itself while
+         sitting inside a collapsed container — which is exactly what a
+         navigation tree looks like. Checking only the element's own style
+         reports a hidden menu item as visible, and the script then clicks it
+         instead of the button the operator can see.
+         `offsetParent === null` catches this in a real browser but depends on
+         layout, which a test environment does not have. Walking computed
+         style is correct in both. */
+      var node = el;
+      while (node && node.nodeType === 1) {
+        if (node.hidden) return false;
+        var cs = global.getComputedStyle ? global.getComputedStyle(node) : null;
+        if (cs) {
+          if (cs.display === "none" || cs.visibility === "hidden") return false;
+          /* position:fixed elements report offsetParent === null while fully
+             on screen, so they must never be judged by layout below. */
+          if (cs.position === "fixed") return true;
         }
+        node = node.parentElement;
+      }
+
+      /* Layout check last, and only when layout actually exists. */
+      if (typeof el.getBoundingClientRect === "function") {
+        var r = el.getBoundingClientRect();
+        var hasLayout = r.width || r.height || r.top || r.left;
+        if (hasLayout && r.width === 0 && r.height === 0) return false;
       }
       return true;
     },

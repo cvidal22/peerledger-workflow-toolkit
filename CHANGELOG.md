@@ -17,6 +17,10 @@ Grouped by script, because installs happen one script at a time.
 - Fixed `adapter.readKv` — the host's placeholder dash is normalised to empty at the boundary, so templates fail properly instead of emitting `released -`
 - Fixed language scoring — distinctive markers only, confidence measured against the nearest rival. Portuguese was previously detected as English because pt/es share vocabulary
 
+**docs/scenarios.js** — new. Seven failure modes as URL switches: slow load, swallowed click, concurrent write, throttled timers, stale keep-alive view, colliding sidebar text, teleported menus.
+
+**core/pl-core.js (spa.visible)** — fixed: only the element's own computed style was checked, so a control inside a collapsed ancestor read as visible. Now walks ancestors, which does not depend on a layout engine. Found by the `twins` scenario.
+
 **scripts/macro-matrix.user.js** — new. Six case types × eight actions from one skeleton.
 
 **scripts/compound-resolution.user.js** — new. Multi-step resolution through the chain runner.
