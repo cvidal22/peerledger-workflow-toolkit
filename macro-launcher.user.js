@@ -1,11 +1,11 @@
 // ==UserScript==
 // @name         PeerLedger — Macro Launcher
 // @namespace    https://github.com/cvidal22
-// @version      3.2.0
+// @version      3.1.2
 // @description  Keyboard-invoked searchable macro palette. Fills templates from live case data and inserts into the note field. Refuses to insert anything it could not fully resolve.
 // @author       cvidal22
 // @match        https://cvidal22.github.io/peerledger-workflow-toolkit/*
-// @require      https://raw.githubusercontent.com/cvidal22/peerledger-workflow-toolkit/main/core/pl-core.js?v=3.2.0
+// @require      https://raw.githubusercontent.com/cvidal22/peerledger-workflow-toolkit/main/core/pl-core.js?v=3.1.2
 // @grant        none
 // @run-at       document-idle
 // ==/UserScript==
@@ -85,7 +85,7 @@
 if (typeof PL === "undefined" || !PL.ui || !PL.ui.button) return;
 
   if (!PL.guard("macro-launcher")) return;
-  PL.requireCore("3.2.0");
+  PL.requireCore("3.1.2");
   PL.register("macro-launcher", "3.0.0");
 
   var MACROS = [
@@ -253,13 +253,6 @@ if (typeof PL === "undefined" || !PL.ui || !PL.ui.button) return;
     id: "macros",
     label: "Macros",
     pages: ["case"],
-    disabled: function () {
-      var m = PL.dom.qs("#main");
-      if (!m || !m.getAttribute("data-claim-id")) return "Open a claim first.";
-      return m.getAttribute("data-claim-state") === "closed"
-        ? "This claim is closed — the macro palette is unavailable." : null;
-    },
-    hotkey: "Alt+K",
     /* No popover: this button IS the action. A palette that needed two
        clicks to open would be slower than the dropdown it replaces. */
     onClick: open,

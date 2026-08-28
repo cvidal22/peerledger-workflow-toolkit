@@ -2,6 +2,18 @@
 
 Grouped by script, because installs happen one script at a time.
 
+## 3.2.0
+
+**docs/preview.js** — new. A visitor can load the toolkit into the page without installing an extension. Nobody evaluating a repository installs a browser extension to look at it, so a demo that requires setup before it shows anything is a demo nobody sees. The same seven files are loaded; nothing is forked for preview.
+
+**core/pl-core.js (ui)**
+- Buttons accept a `disabled()` predicate returning a reason. Dimmed, reason on hover, and clicking says why rather than doing nothing
+- Buttons accept `hotkey` and show it in the tooltip
+- Fixed a mutation-observer feedback loop: `refresh()` writes badge text and title attributes, which are mutations, which triggered `refresh()` again. Mutations originating inside the toolkit are now ignored, and writes only happen on change
+- Dock carries a small "toolkit" label so it reads as one tool rather than stray widgets
+
+**scripts** — `Auto Claim` is actionable only on the pool; the action buttons dim on a closed claim. `Compose` separates its route buttons from its output actions.
+
 ## 3.1.2
 
 **All scripts** — `@require` moved from jsDelivr to `raw.githubusercontent.com`. jsDelivr caches a branch URL for up to 12 hours and **ignores query strings**, so the `?v=` cache-buster added in 3.1.1 did nothing: an updated core kept serving stale and no button ever appeared. Raw caches for five minutes and honours the query. `build/validate.js` now fails the build if a script points at a CDN host.

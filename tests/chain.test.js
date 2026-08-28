@@ -54,17 +54,27 @@ const autoConfirm = () => {
   await wait(6000);
   stop();
 
-  console.log("steps:", [...(popBody(w)||openBtn(w,"Resolve + Close")).querySelectorAll(".pl-step")].map(s => s.textContent.trim()));
+  /* After the chain closes the claim the button is legitimately disabled, so
+     the popover is gone. Assert that rather than trying to reopen it. */
+  {
+    const rcBtn = [...w.document.querySelectorAll("#pl-dock .pl-b")]
+      .find(b => b.querySelector(".lb").textContent === "Resolve + Close");
+    console.log("button disabled after close:", rcBtn.classList.contains("off"), "|", rcBtn.title);
+  }
   console.log("claim state now:", $("#main").getAttribute("data-claim-state"));
   console.log("messages sent:", $$("#sent-log .sent:not(.none)").length);
   console.log("notes:", $$("#notes-table tbody tr").length);
-  console.log("panel tail:", panel().textContent.replace(/\s+/g," ").slice(-150));
+  console.log("claim closed:", $("#main").getAttribute("data-claim-state"));
 
   console.log("\n=== TEST 2: once-guard (rerun same case) ===");
   // reopen case view
   w.location.hash = "#/queue"; await wait(120);
   w.location.hash = "#/claim/PL-204871"; await wait(250);
-  console.log("panel says:", panel().textContent.replace(/\s+/g," ").slice(0,110));
+  {
+    const b = [...w.document.querySelectorAll("#pl-dock .pl-b")]
+      .find(x => x.querySelector(".lb").textContent === "Resolve + Close");
+    console.log("rerun blocked:", b.classList.contains("off") ? b.title : "(button still live)");
+  }
 
   console.log("\n=== TEST 3: preflight refusal (message already sent) ===");
   w.location.hash = "#/claim/PL-204955"; await wait(250);
@@ -75,7 +85,7 @@ const autoConfirm = () => {
   console.log("sent count:", $$("#sent-log .sent:not(.none)").length);
   click([...(popBody(w)||openBtn(w,"Resolve + Close")).querySelectorAll(".pl-btn")][0]);
   await wait(500);
-  console.log("result:", panel().textContent.replace(/\s+/g," ").slice(-330));
+  console.log("result:", (popBody(w)||{textContent:"(closed)"}).textContent.replace(/\s+/g," ").slice(-330));
   console.log("notes (should be 1, unchanged):", $$("#notes-table tbody tr").length);
   console.log("claim state (should be open):", $("#main").getAttribute("data-claim-state"));
 
@@ -91,7 +101,13 @@ const autoConfirm = () => {
   click([...(popBody(w)||openBtn(w,"Resolve + Close")).querySelectorAll(".pl-btn")][0]);
   await wait(6000);
   stop2();
-  console.log("steps:", [...(popBody(w)||openBtn(w,"Resolve + Close")).querySelectorAll(".pl-step")].map(s => s.textContent.trim()));
+  /* After the chain closes the claim the button is legitimately disabled, so
+     the popover is gone. Assert that rather than trying to reopen it. */
+  {
+    const rcBtn = [...w.document.querySelectorAll("#pl-dock .pl-b")]
+      .find(b => b.querySelector(".lb").textContent === "Resolve + Close");
+    console.log("button disabled after close:", rcBtn.classList.contains("off"), "|", rcBtn.title);
+  }
   console.log("panel tail:", panel().textContent.replace(/\s+/g," ").slice(-420));
   console.log("claim state (should still be open):", $("#main").getAttribute("data-claim-state"));
 

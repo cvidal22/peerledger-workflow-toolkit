@@ -1,11 +1,11 @@
 // ==UserScript==
 // @name         PeerLedger — Context Aggregator
 // @namespace    https://github.com/cvidal22
-// @version      3.1.2
+// @version      3.2.0
 // @description  Collapses order state, counterparty asymmetry and evidence inventory into one always-visible brief, so the decision starts from a single view.
 // @author       cvidal22
 // @match        https://cvidal22.github.io/peerledger-workflow-toolkit/*
-// @require      https://raw.githubusercontent.com/cvidal22/peerledger-workflow-toolkit/main/core/pl-core.js?v=3.1.2
+// @require      https://raw.githubusercontent.com/cvidal22/peerledger-workflow-toolkit/main/core/pl-core.js?v=3.2.0
 // @grant        none
 // @run-at       document-idle
 // ==/UserScript==
@@ -74,7 +74,7 @@
 if (typeof PL === "undefined" || !PL.ui || !PL.ui.button) return;
 
   if (!PL.guard("context-aggregator")) return;
-  PL.requireCore("3.1.2");
+  PL.requireCore("3.2.0");
   PL.register("context-aggregator", "3.0.0");
 
   function render(body) {
@@ -134,6 +134,10 @@ if (typeof PL === "undefined" || !PL.ui || !PL.ui.button) return;
     label: "Brief",
     title: "Case brief",
     pages: ["case"],
+    disabled: function () {
+      return PL.adapter.caseKey() ? null : "Open a claim first.";
+    },
+    hotkey: "Alt+2",
     render: render,
     badge: function () {
       var c = PL.adapter.readCase();

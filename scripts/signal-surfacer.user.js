@@ -1,11 +1,11 @@
 // ==UserScript==
 // @name         PeerLedger — Signal Surfacer
 // @namespace    https://github.com/cvidal22
-// @version      3.1.2
+// @version      3.2.0
 // @description  Scans the trade transcript and claim statement for known policy-violation patterns and surfaces the matching lines for human review. Flags, never decides.
 // @author       cvidal22
 // @match        https://cvidal22.github.io/peerledger-workflow-toolkit/*
-// @require      https://raw.githubusercontent.com/cvidal22/peerledger-workflow-toolkit/main/core/pl-core.js?v=3.1.2
+// @require      https://raw.githubusercontent.com/cvidal22/peerledger-workflow-toolkit/main/core/pl-core.js?v=3.2.0
 // @grant        none
 // @run-at       document-idle
 // ==/UserScript==
@@ -88,7 +88,7 @@
 if (typeof PL === "undefined" || !PL.ui || !PL.ui.button) return;
 
   if (!PL.guard("signal-surfacer")) return;
-  PL.requireCore("3.1.2");
+  PL.requireCore("3.2.0");
   PL.register("signal-surfacer", "3.0.0");
 
   var PATTERNS = [
@@ -187,6 +187,9 @@ if (typeof PL === "undefined" || !PL.ui || !PL.ui.button) return;
     label: "Flags",
     title: "Flagged lines",
     pages: ["case"],
+    disabled: function () {
+      return PL.adapter.caseKey() ? null : "Open a claim first.";
+    },
     variant: "warn",
     /* The badge is the whole point of this script being a button: the
        operator sees there is something to read without opening anything. */

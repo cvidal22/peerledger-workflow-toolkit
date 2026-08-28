@@ -17,7 +17,7 @@
 (function (global) {
   "use strict";
 
-  var PL = { version: "3.1.2" };
+  var PL = { version: "3.2.0" };
 
   /* ================================================================
    * dom
@@ -1003,13 +1003,15 @@
 
   var CSS = [
     /* ---- left dock: one button per script, stacked ---------------------- */
-    "#pl-dock{position:fixed;left:0;top:22vh;z-index:9000;display:flex;flex-direction:column;gap:5px;",
+    "#pl-dock{position:fixed;left:0;top:20vh;z-index:9000;display:flex;flex-direction:column;gap:5px;",
     "font:12.5px/1.3 system-ui,-apple-system,sans-serif}",
     "#pl-dock .pl-b{display:flex;align-items:center;gap:6px;min-width:104px;padding:7px 10px 7px 9px;",
     "border:1px solid #cfd4da;border-left:0;border-radius:0 4px 4px 0;background:#fff;color:#1b1d22;",
     "cursor:pointer;font:inherit;text-align:left;box-shadow:1px 1px 5px rgba(0,0,0,.09);white-space:nowrap}",
     "#pl-dock .pl-b:hover{background:#f4f6f7;border-color:#9aa3ad}",
     "#pl-dock .pl-b:disabled{opacity:.4;cursor:default;box-shadow:none}",
+    "#pl-dock .pl-b.off{opacity:.45;background:#f4f5f6;box-shadow:none}",
+    "#pl-dock .pl-b.off:hover{background:#f4f5f6;border-color:#cfd4da}",
     "#pl-dock .pl-b .dot{width:7px;height:7px;border-radius:50%;background:#c3c8cf;flex:0 0 auto}",
     "#pl-dock .pl-b.on{background:#1f4d5c;border-color:#1f4d5c;color:#fff;font-weight:600}",
     "#pl-dock .pl-b.on .dot{background:#7fd4a8}",
@@ -1017,6 +1019,8 @@
     "#pl-dock .pl-b.warn .dot{background:#c98a2e}",
     "#pl-dock .pl-b.open{border-color:#1f4d5c}",
     "#pl-dock .pl-b .lb{flex:1}",
+    "#pl-dock .pl-tag{font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:#8d939e;",
+    "padding:0 0 1px 10px;font-weight:650;user-select:none}",
     "#pl-dock .pl-b .bd{font-family:ui-monospace,Menlo,monospace;font-size:11px;padding:0 5px;border-radius:8px;",
     "background:#eceef1;color:#5b616d}",
     "#pl-dock .pl-b.on .bd{background:rgba(255,255,255,.22);color:#fff}",
@@ -1044,6 +1048,7 @@
     ".pl-btn{font:inherit;font-size:12px;padding:5px 9px;border:1px solid #dcdfe4;background:#fff;border-radius:2px;cursor:pointer;margin:0 5px 5px 0}",
     ".pl-btn:hover{border-color:#8d939e}.pl-btn.on{background:#1f4d5c;border-color:#1f4d5c;color:#fff}",
     ".pl-btn:disabled{opacity:.45;cursor:default}",
+    ".pl-acts{margin-top:9px;padding-top:9px;border-top:1px solid #eaecef;display:flex;flex-wrap:wrap}",
     ".pl-out{width:100%;min-height:130px;font:11.5px/1.5 ui-monospace,Menlo,monospace;border:1px solid #dcdfe4;padding:7px;resize:vertical;margin-top:7px}",
     ".pl-hint{font-size:11px;color:#8d939e;margin-top:5px}",
     ".pl-quote{font-size:11.5px;color:#5b616d;border-left:2px solid #dcdfe4;padding-left:7px;margin:3px 0}",
@@ -1108,6 +1113,7 @@
       if (d) return d;
       PL.dom.style("pl-core-css", CSS);
       d = PL.dom.el("div", { id: "pl-dock" });
+      d.appendChild(PL.dom.el("div", { class: "pl-tag", text: "toolkit" }));
       document.body.appendChild(d);
 
       /* Close the popover on outside click or Escape. */
@@ -1127,7 +1133,19 @@
          and a stale count on a button is worse than no count, because it is
          believed. Debounced so a burst of mutations costs one pass. */
       var t = null;
-      new MutationObserver(function () {
+      new MutationObserver(function (records) {
+        /* Ignore mutations the toolkit itself caused. refresh() writes badge
+           text and title attributes, which are mutations, which would trigger
+           refresh again — a loop that spins forever at one pass per debounce
+           and is invisible except as battery drain. */
+        var external = records.some(function (r) {
+          var n = r.target;
+          if (!n) return false;
+          if (n.nodeType !== 1) n = n.parentElement;
+          if (!n) return false;
+          return !n.closest("#pl-dock, #pl-pop, #pl-ov, #pl-cf, #pl-toasts");
+        });
+        if (!external) return;
         clearTimeout(t);
         t = setTimeout(function () { PL.ui.refresh(); }, 140);
       }).observe(document.body, { childList: true, subtree: true, attributes: true });
@@ -1159,9 +1177,15 @@
       el.appendChild(badge);
 
       el.addEventListener("click", function () {
+        /* A disabled button explains itself rather than doing nothing. A
+           control that silently ignores a click reads as broken, and the
+           operator retries instead of reading. */
+        var why = spec.disabled ? spec.disabled() : null;
+        if (why) { PL.ui.toast(why); return; }
         if (spec.onClick) { spec.onClick(); PL.ui.refresh(); return; }
         PL.ui.togglePopover(spec);
       });
+      if (spec.hotkey) el.title = spec.label + "  (" + spec.hotkey + ")";
 
       document.getElementById("pl-dock").appendChild(el);
       var rec = { spec: spec, el: el, badge: badge };
@@ -1183,11 +1207,20 @@
           if (PL.ui._openId === id) PL.ui.closePopover();
           return;
         }
-        var b = spec.badge ? spec.badge() : null;
-        rec.badge.textContent = b == null ? "" : String(b);
-        rec.badge.style.display = b == null ? "none" : "";
-        if (spec.variant) rec.el.classList.toggle(spec.variant, true);
+        var why = spec.disabled ? spec.disabled() : null;
+        rec.el.classList.toggle("off", !!why);
+
+        var title = why || (spec.hotkey ? spec.label + "  (" + spec.hotkey + ")" : spec.label);
+        if (rec.el.title !== title) rec.el.title = title;
+
+        var b = why ? null : (spec.badge ? spec.badge() : null);
+        var txt = b == null ? "" : String(b);
+        if (rec.badge.textContent !== txt) rec.badge.textContent = txt;
+        var disp = b == null ? "none" : "";
+        if (rec.badge.style.display !== disp) rec.badge.style.display = disp;
+        if (spec.variant) rec.el.classList.toggle(spec.variant, !why);
         rec.el.classList.toggle("open", PL.ui._openId === id);
+        if (why && PL.ui._openId === id) PL.ui.closePopover();
       });
 
     },

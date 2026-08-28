@@ -4,7 +4,7 @@
 
 Seven browser userscripts on a shared core, running against a fictional peer-to-peer dispute console. Live and installable in about two minutes.
 
-**[→ Open the demo console](https://cvidal22.github.io/peerledger-workflow-toolkit/)**  ·  **[→ Engineering notes](ENGINEERING-NOTES.md)**  ·  **[→ Architecture](guide/ARCHITECTURE.md)**  ·  **[→ DOM cookbook](guide/dom-cookbook.md)**
+**[→ Open the demo console](https://cvidal22.github.io/peerledger-workflow-toolkit/?toolkit=1)** — loads the toolkit straight into the page, no extension needed  ·  **[→ Engineering notes](ENGINEERING-NOTES.md)**  ·  **[→ Architecture](guide/ARCHITECTURE.md)**  ·  **[→ DOM cookbook](guide/dom-cookbook.md)**
 
 *If you only read one thing here, read the [engineering notes](ENGINEERING-NOTES.md). The scripts demonstrate; that document explains what was learned building the real thing.*
 
@@ -241,6 +241,8 @@ Seven scripts, seven buttons, docked at the left edge — the one screen region 
 | **Resolve + Close** | case | Runs the full chain: message, note, close. |
 | **Matrix** | case | The full case-type × action grid. Badge shows the cell count. |
 
+A button that cannot act is dimmed and says why on hover, and clicking it says why rather than doing nothing — `Auto Claim` off the pool, or any action button on a closed claim. A control that silently ignores a click reads as broken, and the operator retries instead of reading.
+
 Three deliberate choices:
 
 **A button per script, not one shared panel.** A panel is a single surface every script has to share, so installing one means accepting everyone's UI. With a button each, install three of the seven and you get three buttons.
@@ -250,6 +252,10 @@ Three deliberate choices:
 **Badges are live.** They track the page rather than navigation, because claiming a case from the pool changes neither the view nor the open case — a badge keyed on those would go stale. A stale count on a button is worse than no count, because it gets believed.
 
 ## Try it
+
+**Without installing anything:** open the [demo with the toolkit loaded](https://cvidal22.github.io/peerledger-workflow-toolkit/?toolkit=1). The same seven files, loaded as page scripts instead of by an extension — nothing is forked for preview mode.
+
+**As it actually runs**, in an extension:
 
 1. Install [Tampermonkey](https://www.tampermonkey.net/) (Chrome, Firefox, Edge, Safari).
 2. Click each script below — Tampermonkey will offer to install it.

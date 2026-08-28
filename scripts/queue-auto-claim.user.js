@@ -1,11 +1,11 @@
 // ==UserScript==
 // @name         PeerLedger — Queue Auto-Claim
 // @namespace    https://github.com/cvidal22
-// @version      3.1.2
+// @version      3.2.0
 // @description  Watches the unassigned pool and claims the next case automatically, so the operator is never sitting on a refresh button between cases.
 // @author       cvidal22
 // @match        https://cvidal22.github.io/peerledger-workflow-toolkit/*
-// @require      https://raw.githubusercontent.com/cvidal22/peerledger-workflow-toolkit/main/core/pl-core.js?v=3.1.2
+// @require      https://raw.githubusercontent.com/cvidal22/peerledger-workflow-toolkit/main/core/pl-core.js?v=3.2.0
 // @grant        none
 // @run-at       document-idle
 // ==/UserScript==
@@ -89,7 +89,7 @@
 if (typeof PL === "undefined" || !PL.ui || !PL.ui.button) return;
 
   if (!PL.guard("queue-auto-claim")) return;
-  PL.requireCore("3.1.2");
+  PL.requireCore("3.2.0");
   PL.register("queue-auto-claim", "3.0.0");
 
   var poller = null;
@@ -192,6 +192,14 @@ if (typeof PL === "undefined" || !PL.ui || !PL.ui.button) return;
     title: "Auto-claim",
     pages: ["pool", "queue", "escalations", "closed"],
     toggle: true,
+    hotkey: "Alt+A",
+    /* Visible on every list view so its state is never hidden, but only
+       actionable where there is a pool to claim from. Hiding it on the other
+       lists would mean an operator could not tell whether it was still armed. */
+    disabled: function () {
+      return PL.adapter.view() === "pool" ? null
+        : "Auto-claim works on the unassigned pool. Alt+P to go there.";
+    },
     badge: function () {
       if (PL.adapter.view() !== "pool") return null;
       var n = PL.adapter.readQueue().filter(function (r) { return r.claimButton; }).length;

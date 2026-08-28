@@ -1,11 +1,11 @@
 // ==UserScript==
 // @name         PeerLedger — Macro Matrix
 // @namespace    https://github.com/cvidal22
-// @version      3.1.2
+// @version      3.2.0
 // @description  Generates the full case-type × action macro grid from one skeleton. Per-party language resolution on outbound messages, single-language internal notes, review gate before every save, marker-verified writes.
 // @author       cvidal22
 // @match        https://cvidal22.github.io/peerledger-workflow-toolkit/*
-// @require      https://raw.githubusercontent.com/cvidal22/peerledger-workflow-toolkit/main/core/pl-core.js?v=3.1.2
+// @require      https://raw.githubusercontent.com/cvidal22/peerledger-workflow-toolkit/main/core/pl-core.js?v=3.2.0
 // @grant        none
 // @run-at       document-idle
 // ==/UserScript==
@@ -95,7 +95,7 @@
 if (typeof PL === "undefined" || !PL.ui || !PL.ui.button) return;
 
   if (!PL.guard("macro-matrix")) return;
-  PL.requireCore("3.1.2");
+  PL.requireCore("3.2.0");
   PL.register("macro-matrix", "3.0.0");
 
   /* ---- demo translator ------------------------------------------------
@@ -435,6 +435,13 @@ if (typeof PL === "undefined" || !PL.ui || !PL.ui.button) return;
     label: "Matrix",
     title: "Macro matrix",
     pages: ["case"],
+    disabled: function () {
+      var m = PL.dom.qs("#main");
+      if (!m || !m.getAttribute("data-claim-id")) return "Open a claim first.";
+      return m.getAttribute("data-claim-state") === "closed"
+        ? "This claim is closed — the macro matrix is unavailable." : null;
+    },
+    hotkey: "Alt+M",
     badge: function () {
       return String(Object.keys(CASE_TYPES).length * Object.keys(ACTIONS).length);
     },

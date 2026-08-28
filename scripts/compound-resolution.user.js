@@ -1,11 +1,11 @@
 // ==UserScript==
 // @name         PeerLedger — Compound Resolution
 // @namespace    https://github.com/cvidal22
-// @version      3.1.2
+// @version      3.2.0
 // @description  Runs a full resolution as one operator gesture: send the user message, record the case note, close the claim. Preflighted, verified between steps, aborts on failure and reports exactly what committed.
 // @author       cvidal22
 // @match        https://cvidal22.github.io/peerledger-workflow-toolkit/*
-// @require      https://raw.githubusercontent.com/cvidal22/peerledger-workflow-toolkit/main/core/pl-core.js?v=3.1.2
+// @require      https://raw.githubusercontent.com/cvidal22/peerledger-workflow-toolkit/main/core/pl-core.js?v=3.2.0
 // @grant        none
 // @run-at       document-idle
 // ==/UserScript==
@@ -105,7 +105,7 @@
 if (typeof PL === "undefined" || !PL.ui || !PL.ui.button) return;
 
   if (!PL.guard("compound-resolution")) return;
-  PL.requireCore("3.1.2");
+  PL.requireCore("3.2.0");
   PL.register("compound-resolution", "3.0.0");
 
   var lastResult = null;
@@ -354,6 +354,13 @@ if (typeof PL === "undefined" || !PL.ui || !PL.ui.button) return;
     label: "Resolve + Close",
     title: "Compound resolution",
     pages: ["case"],
+    disabled: function () {
+      var m = PL.dom.qs("#main");
+      if (!m || !m.getAttribute("data-claim-id")) return "Open a claim first.";
+      return m.getAttribute("data-claim-state") === "closed"
+        ? "This claim is closed — the resolution chain is unavailable." : null;
+    },
+    hotkey: "Alt+1 / Alt+2",
     render: function (body) { draw(body, lastLog, lastProgress, lastResult); }
   });
 

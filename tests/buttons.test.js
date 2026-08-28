@@ -60,6 +60,23 @@ const check=(n,ok,d)=>{console.log(`${ok?"  ok  ":"  FAIL"}  ${n}${d?" — "+d:"
   check("badge updates after a claim that changed neither view nor case",
     ac.querySelector(".bd").textContent === String(Number(badge0)-1),
     badge0+" -> "+ac.querySelector(".bd").textContent);
+  console.log("\n-- disabled states explain themselves --");
+  w.location.hash="#/queue"; await wait(250);
+  const ac2=$$("#pl-dock .pl-b").find(b=>b.querySelector(".lb").textContent==="Auto Claim");
+  check("Auto Claim is dimmed off the pool", ac2.classList.contains("off"));
+  check("and says why on hover", /unassigned pool/i.test(ac2.title), ac2.title);
+  click(ac2); await wait(120);
+  check("clicking a dimmed button toasts instead of opening",
+    !$("#pl-pop") && !!$(".pl-toast"), $(".pl-toast")?$(".pl-toast").textContent:"(no toast)");
+
+  w.location.hash="#/claim/PL-204871"; await wait(250);
+  const macros=$$("#pl-dock .pl-b").find(b=>b.querySelector(".lb").textContent==="Macros");
+  check("Macros is live on an open claim", !macros.classList.contains("off"));
+  check("buttons carry their hotkey in the tooltip", /Alt\+K/.test(macros.title), macros.title);
+
+  console.log("\n-- dock is labelled --");
+  check("dock has a label", !!$("#pl-dock .pl-tag"), ($("#pl-dock .pl-tag")||{}).textContent);
+
   console.log(failures?`\n${failures} failure(s)`:"\nall button tests passed");
   process.exit(failures?1:0);
 })();

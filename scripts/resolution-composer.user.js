@@ -1,11 +1,11 @@
 // ==UserScript==
 // @name         PeerLedger — Resolution Composer
 // @namespace    https://github.com/cvidal22
-// @version      3.1.2
+// @version      3.2.0
 // @description  After the operator chooses a resolution route, assembles the outbound user message and the internal case note from live case data. Composition runs strictly after judgement.
 // @author       cvidal22
 // @match        https://cvidal22.github.io/peerledger-workflow-toolkit/*
-// @require      https://raw.githubusercontent.com/cvidal22/peerledger-workflow-toolkit/main/core/pl-core.js?v=3.1.2
+// @require      https://raw.githubusercontent.com/cvidal22/peerledger-workflow-toolkit/main/core/pl-core.js?v=3.2.0
 // @grant        none
 // @run-at       document-idle
 // ==/UserScript==
@@ -81,7 +81,7 @@
 if (typeof PL === "undefined" || !PL.ui || !PL.ui.button) return;
 
   if (!PL.guard("resolution-composer")) return;
-  PL.requireCore("3.1.2");
+  PL.requireCore("3.2.0");
   PL.register("resolution-composer", "3.0.0");
 
   var ROUTES = [
@@ -207,7 +207,12 @@ if (typeof PL === "undefined" || !PL.ui || !PL.ui.button) return;
 
     body.appendChild(out);
 
-    body.appendChild(PL.dom.el("button", {
+    /* Routes choose an outcome; these act on what was composed. Mixing them
+       in one row invites clicking an action while meaning to pick a route. */
+    var acts = PL.dom.el("div", { class: "pl-acts" });
+    body.appendChild(acts);
+
+    acts.appendChild(PL.dom.el("button", {
       class: "pl-btn", text: "Copy both",
       onclick: function () {
         if (!active) { PL.ui.toast("Pick a route first."); return; }
@@ -216,7 +221,7 @@ if (typeof PL === "undefined" || !PL.ui || !PL.ui.button) return;
       }
     }));
 
-    body.appendChild(PL.dom.el("button", {
+    acts.appendChild(PL.dom.el("button", {
       class: "pl-btn", text: "Note → field",
       onclick: function () {
         if (!active) { PL.ui.toast("Pick a route first."); return; }
@@ -244,6 +249,12 @@ if (typeof PL === "undefined" || !PL.ui || !PL.ui.button) return;
     label: "Compose",
     title: "Resolution composer",
     pages: ["case"],
+    disabled: function () {
+      var m = PL.dom.qs("#main");
+      if (!m || !m.getAttribute("data-claim-id")) return "Open a claim first.";
+      return m.getAttribute("data-claim-state") === "closed"
+        ? "This claim is closed — composing is unavailable." : null;
+    },
     render: render
   });
 
