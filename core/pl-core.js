@@ -17,7 +17,7 @@
 (function (global) {
   "use strict";
 
-  var PL = { version: "6.1.0" };
+  var PL = { version: "6.1.1" };
 
   /* ================================================================
    * dom

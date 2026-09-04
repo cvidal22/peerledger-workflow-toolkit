@@ -1,11 +1,11 @@
 // ==UserScript==
 // @name         Dispute Handling — Context Aggregator
 // @namespace    https://github.com/cvidal22
-// @version      6.1.0
+// @version      6.1.1
 // @description  One brief per appeal: order facts, the buyer/seller comparison, evidence inventory, and any policy-pattern matches the Signal Surfacer found.
 // @author       cvidal22
 // @match        https://cvidal22.github.io/peerledger-workflow-toolkit/*
-// @require      https://raw.githubusercontent.com/cvidal22/peerledger-workflow-toolkit/main/core/pl-core.js?v=6.1.0
+// @require      https://raw.githubusercontent.com/cvidal22/peerledger-workflow-toolkit/main/core/pl-core.js?v=6.1.1
 // @grant        none
 // @run-at       document-idle
 // ==/UserScript==
@@ -74,7 +74,7 @@
 if (typeof PL === "undefined" || !PL.ui || !PL.ui.button) return;
 
   if (!PL.guard("context-aggregator")) return;
-  PL.requireCore("6.1.0");
+  PL.requireCore("6.1.1");
   PL.register("context-aggregator", "3.0.0");
 
   /* Supplied by the Signal Surfacer. Absent if that script is not installed,

@@ -1,11 +1,11 @@
 // ==UserScript==
 // @name         Dispute Handling — Signal Surfacer
 // @namespace    https://github.com/cvidal22
-// @version      6.1.0
+// @version      6.1.1
 // @description  Scans the trade transcript and claim statement for known policy-violation patterns. Publishes matches for the Brief to render; registers no button and makes no judgement.
 // @author       cvidal22
 // @match        https://cvidal22.github.io/peerledger-workflow-toolkit/*
-// @require      https://raw.githubusercontent.com/cvidal22/peerledger-workflow-toolkit/main/core/pl-core.js?v=6.1.0
+// @require      https://raw.githubusercontent.com/cvidal22/peerledger-workflow-toolkit/main/core/pl-core.js?v=6.1.1
 // @grant        none
 // @run-at       document-idle
 // ==/UserScript==
@@ -88,7 +88,7 @@
 if (typeof PL === "undefined" || !PL.ui || !PL.ui.button) return;
 
   if (!PL.guard("signal-surfacer")) return;
-  PL.requireCore("6.1.0");
+  PL.requireCore("6.1.1");
   PL.register("signal-surfacer", "3.0.0");
 
   var PATTERNS = [

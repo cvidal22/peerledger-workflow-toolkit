@@ -1,11 +1,11 @@
 // ==UserScript==
 // @name         Dispute Handling — Macro Engine
 // @namespace    https://github.com/cvidal22
-// @version      6.1.0
+// @version      6.1.1
 // @description  Generates the full case-type × action macro grid from one skeleton. Per-party language resolution on outbound messages, single-language internal notes, review gate before every save, marker-verified writes.
 // @author       cvidal22
 // @match        https://cvidal22.github.io/peerledger-workflow-toolkit/*
-// @require      https://raw.githubusercontent.com/cvidal22/peerledger-workflow-toolkit/main/core/pl-core.js?v=6.1.0
+// @require      https://raw.githubusercontent.com/cvidal22/peerledger-workflow-toolkit/main/core/pl-core.js?v=6.1.1
 // @grant        none
 // @run-at       document-idle
 // ==/UserScript==
@@ -95,7 +95,7 @@
 if (typeof PL === "undefined" || !PL.ui || !PL.ui.button) return;
 
   if (!PL.guard("macro-matrix")) return;
-  PL.requireCore("6.1.0");
+  PL.requireCore("6.1.1");
   PL.register("macro-matrix", "3.0.0");
 
   /* ---- demo translator ------------------------------------------------

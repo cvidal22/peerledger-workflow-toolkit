@@ -1,6 +1,6 @@
 {
   "name": "peerledger-workflow-toolkit",
-  "version": "6.1.0",
+  "version": "6.1.1",
   "private": true,
   "description": "Userscript toolkit demonstrating operational workflow automation against a fictional dispute console.",
   "scripts": {

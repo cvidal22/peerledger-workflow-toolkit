@@ -82,9 +82,37 @@ function build() {
   return parts.join("\n");
 }
 
+/* Stamp the demo page's own assets with the version too.
+   Only the toolkit bundle was cache-busted, so after an update a browser —
+   or the Pages CDN — kept serving the previous styles.css, app.js and
+   data.js. The page looked like an older release while the toolkit inside
+   it was current, which is a confusing way to fail. */
+function stampAssets(version) {
+  const page = path.join(ROOT, "docs", "index.html");
+  let html = fs.readFileSync(page, "utf8");
+  const stamped = html.replace(
+    /(href|src)="(styles\.css|data\.js|app\.js|preview\.js)\?v=[^"]*"/g,
+    (_, attr, file) => `${attr}="${file}?v=${version}"`
+  );
+  if (stamped !== html) {
+    fs.writeFileSync(page, stamped);
+    return true;
+  }
+  return false;
+}
+
+const coreVersion =
+  (fs.readFileSync(path.join(ROOT, "core", "pl-core.js"), "utf8")
+     .match(/version:\s*"(\d+\.\d+\.\d+)"/) || [])[1] || "0.0.0";
+
 const generated = build();
 
 if (process.argv.includes("--check")) {
+  const html = fs.readFileSync(path.join(ROOT, "docs", "index.html"), "utf8");
+  if (!html.includes(`app.js?v=${coreVersion}`)) {
+    console.error(`✕ docs/index.html assets are not stamped ${coreVersion} — run: node build/bundle.js`);
+    process.exit(1);
+  }
   let current = "";
   try { current = fs.readFileSync(OUT, "utf8"); } catch (e) { /* missing */ }
   if (current !== generated) {
@@ -96,4 +124,5 @@ if (process.argv.includes("--check")) {
 }
 
 fs.writeFileSync(OUT, generated);
+if (stampAssets(coreVersion)) console.log(`✓ stamped docs/index.html assets ${coreVersion}`);
 console.log(`✓ wrote docs/toolkit.bundle.js (${(generated.length / 1024).toFixed(0)} KB, core + ${ORDER.length} scripts)`);

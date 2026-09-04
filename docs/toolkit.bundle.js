@@ -28,7 +28,7 @@
 (function (global) {
   "use strict";
 
-  var PL = { version: "6.1.0" };
+  var PL = { version: "6.1.1" };
 
   /* ================================================================
    * dom
@@ -1861,7 +1861,7 @@ try {
 if (typeof PL === "undefined" || !PL.ui || !PL.ui.button) return;
 
   if (!PL.guard("queue-auto-claim")) return;
-  PL.requireCore("6.1.0");
+  PL.requireCore("6.1.1");
   PL.register("queue-auto-claim", "3.0.0");
 
   var poller = null;
@@ -2094,7 +2094,7 @@ try {
 if (typeof PL === "undefined" || !PL.ui || !PL.ui.button) return;
 
   if (!PL.guard("signal-surfacer")) return;
-  PL.requireCore("6.1.0");
+  PL.requireCore("6.1.1");
   PL.register("signal-surfacer", "3.0.0");
 
   var PATTERNS = [
@@ -2240,7 +2240,7 @@ try {
 if (typeof PL === "undefined" || !PL.ui || !PL.ui.button) return;
 
   if (!PL.guard("context-aggregator")) return;
-  PL.requireCore("6.1.0");
+  PL.requireCore("6.1.1");
   PL.register("context-aggregator", "3.0.0");
 
   /* Supplied by the Signal Surfacer. Absent if that script is not installed,
@@ -2451,7 +2451,7 @@ try {
 if (typeof PL === "undefined" || !PL.ui || !PL.ui.button) return;
 
   if (!PL.guard("macro-matrix")) return;
-  PL.requireCore("6.1.0");
+  PL.requireCore("6.1.1");
   PL.register("macro-matrix", "3.0.0");
 
   /* ---- demo translator ------------------------------------------------
@@ -2961,7 +2961,7 @@ try {
 if (typeof PL === "undefined" || !PL.ui || !PL.ui.button) return;
 
   if (!PL.guard("macro-launcher")) return;
-  PL.requireCore("6.1.0");
+  PL.requireCore("6.1.1");
   PL.register("macro-launcher", "3.0.0");
 
   /*

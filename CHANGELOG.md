@@ -2,6 +2,10 @@
 
 Grouped by script, because installs happen one script at a time.
 
+## 6.1.1
+
+**Fixed: the live demo could serve an old version after an update.** Only the toolkit bundle carried a cache-busting version; `styles.css`, `data.js`, `app.js` and `preview.js` did not, so a browser or the Pages CDN kept serving the previous page shell while the toolkit inside it was current. `build/bundle.js` now stamps those assets with the shipped version, and `--check` fails the build if they drift — so this cannot be forgotten on a future release.
+
 ## 6.1.0
 
 **Demo GIF recorded and added to the README.** Captured by driving the real page in headless Chromium rather than staged, so it shows the actual toolkit: Auto Claim opening the top case, then one macro messaging the seller, setting the deadline, writing the note and filing the case. `build/record.js` reproduces it.
@@ -59,6 +63,10 @@ Writing it caught two real bugs:
 **Escalations removed.** It filtered by priority, which was my invention rather than a stage of the work. Three lists — Task pool, Handling, Closed — are the whole model.
 
 **Scenery is dimmed rather than struck through**, and stays clickable: the page it opens explains what would be there, which is more use than a control that refuses to respond.
+
+## 6.1.1
+
+**Fixed: the live demo could serve an old version after an update.** Only the toolkit bundle carried a cache-busting version; `styles.css`, `data.js`, `app.js` and `preview.js` did not, so a browser or the Pages CDN kept serving the previous page shell while the toolkit inside it was current. `build/bundle.js` now stamps those assets with the shipped version, and `--check` fails the build if they drift — so this cannot be forgotten on a future release.
 
 ## 6.1.0
 
