@@ -1,0 +1,16 @@
+{
+  "name": "peerledger-workflow-toolkit",
+  "version": "6.1.1",
+  "private": true,
+  "description": "Userscript toolkit demonstrating operational workflow automation against a fictional dispute console.",
+  "scripts": {
+    "validate": "node build/bundle.js --check && node build/validate.js",
+    "test": "node build/bundle.js --check && node build/validate.js && node tests/toolkit.test.js && node tests/workflow.test.js && node tests/buttons.test.js && node tests/verification.test.js && node tests/readme.test.js",
+    "bundle": "node build/bundle.js",
+    "start": "node build/bundle.js && python3 -m http.server 8000"
+  },
+  "devDependencies": {
+    "jsdom": "^24.0.0"
+  },
+  "license": "MIT"
+}
