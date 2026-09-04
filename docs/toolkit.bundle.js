@@ -28,7 +28,7 @@
 (function (global) {
   "use strict";
 
-  var PL = { version: "6.1.1" };
+  var PL = { version: "6.1.2" };
 
   /* ================================================================
    * dom
@@ -1091,13 +1091,20 @@
        so the dock never sits over table rows or the row the operator is
        reading; the bottom-left corner is the emptiest region of a list view
        and of a two-column detail view alike. */
-    "#pl-dock{position:fixed;left:12px;bottom:12px;z-index:9000;display:flex;flex-direction:column-reverse;",
-    "align-items:flex-start;gap:6px;font:12.5px/1.3 system-ui,-apple-system,sans-serif}",
+    /* A floating dock will always sit over whatever is behind it. Without a
+       surface of its own the label collided with the host page's own headings
+       and the whole thing read as broken rather than as an overlay. Give it a
+       backdrop so it is legible on any background. */
+    "#pl-dock{position:fixed;left:10px;bottom:10px;z-index:9000;display:flex;flex-direction:column-reverse;",
+    "align-items:flex-start;gap:6px;padding:8px 10px 9px;border-radius:10px;",
+    "background:rgba(255,255,255,.93);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);",
+    "border:1px solid rgba(200,160,20,.35);box-shadow:0 3px 14px rgba(0,0,0,.13);",
+    "font:12.5px/1.3 system-ui,-apple-system,sans-serif}",
     /* Deliberately not the host application's palette. These controls were
        added on top of somebody else's product, and an operator should never
        have to wonder whether a button is the platform's or a script's — most
        of all when something goes wrong and they need to say which. */
-    "#pl-dock .pl-b{display:inline-flex;align-items:center;gap:7px;padding:7px 14px;",
+    "#pl-dock .pl-b{display:inline-flex;align-items:center;gap:7px;padding:7px 14px;width:100%;",
     "border:1px solid #e3c766;border-radius:999px;background:#fff6d9;color:#5c4406;",
     "cursor:pointer;font:inherit;text-align:left;box-shadow:0 2px 8px rgba(0,0,0,.12);white-space:nowrap}",
     "#pl-dock .pl-b:hover{background:#ffefbe;border-color:#cfa825}",
@@ -1861,7 +1868,7 @@ try {
 if (typeof PL === "undefined" || !PL.ui || !PL.ui.button) return;
 
   if (!PL.guard("queue-auto-claim")) return;
-  PL.requireCore("6.1.1");
+  PL.requireCore("6.1.2");
   PL.register("queue-auto-claim", "3.0.0");
 
   var poller = null;
@@ -2094,7 +2101,7 @@ try {
 if (typeof PL === "undefined" || !PL.ui || !PL.ui.button) return;
 
   if (!PL.guard("signal-surfacer")) return;
-  PL.requireCore("6.1.1");
+  PL.requireCore("6.1.2");
   PL.register("signal-surfacer", "3.0.0");
 
   var PATTERNS = [
@@ -2240,7 +2247,7 @@ try {
 if (typeof PL === "undefined" || !PL.ui || !PL.ui.button) return;
 
   if (!PL.guard("context-aggregator")) return;
-  PL.requireCore("6.1.1");
+  PL.requireCore("6.1.2");
   PL.register("context-aggregator", "3.0.0");
 
   /* Supplied by the Signal Surfacer. Absent if that script is not installed,
@@ -2451,7 +2458,7 @@ try {
 if (typeof PL === "undefined" || !PL.ui || !PL.ui.button) return;
 
   if (!PL.guard("macro-matrix")) return;
-  PL.requireCore("6.1.1");
+  PL.requireCore("6.1.2");
   PL.register("macro-matrix", "3.0.0");
 
   /* ---- demo translator ------------------------------------------------
@@ -2961,7 +2968,7 @@ try {
 if (typeof PL === "undefined" || !PL.ui || !PL.ui.button) return;
 
   if (!PL.guard("macro-launcher")) return;
-  PL.requireCore("6.1.1");
+  PL.requireCore("6.1.2");
   PL.register("macro-launcher", "3.0.0");
 
   /*

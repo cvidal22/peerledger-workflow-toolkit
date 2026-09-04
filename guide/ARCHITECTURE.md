@@ -66,7 +66,7 @@ Every script starts with:
 
 ```javascript
 if (!PL.guard("script-id")) return;   // refuse to bind twice
-PL.requireCore("6.1.1");              // refuse to run against an old core
+PL.requireCore("6.1.2");              // refuse to run against an old core
 ```
 
 Without the guard, two installed copies mean everything fires twice. Usually happens when a filename stops matching `@name` — extensions match on `@name` when reinstalling, so a mismatch adds a copy instead of replacing one.

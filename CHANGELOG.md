@@ -2,6 +2,12 @@
 
 Grouped by script, because installs happen one script at a time.
 
+## 6.1.2
+
+**Fixed: the toolkit dock overlapped the host page.** With no surface of its own, the version label collided with the sidebar's own headings and the whole dock read as broken rather than as an overlay. It now sits on a translucent card with a border and shadow, legible over anything behind it.
+
+**Breadcrumbs said "Work queue"** while the navigation said "Task pool". Both now say Task pool.
+
 ## 6.1.1
 
 **Fixed: the live demo could serve an old version after an update.** Only the toolkit bundle carried a cache-busting version; `styles.css`, `data.js`, `app.js` and `preview.js` did not, so a browser or the Pages CDN kept serving the previous page shell while the toolkit inside it was current. `build/bundle.js` now stamps those assets with the shipped version, and `--check` fails the build if they drift — so this cannot be forgotten on a future release.
@@ -63,6 +69,12 @@ Writing it caught two real bugs:
 **Escalations removed.** It filtered by priority, which was my invention rather than a stage of the work. Three lists — Task pool, Handling, Closed — are the whole model.
 
 **Scenery is dimmed rather than struck through**, and stays clickable: the page it opens explains what would be there, which is more use than a control that refuses to respond.
+
+## 6.1.2
+
+**Fixed: the toolkit dock overlapped the host page.** With no surface of its own, the version label collided with the sidebar's own headings and the whole dock read as broken rather than as an overlay. It now sits on a translucent card with a border and shadow, legible over anything behind it.
+
+**Breadcrumbs said "Work queue"** while the navigation said "Task pool". Both now say Task pool.
 
 ## 6.1.1
 

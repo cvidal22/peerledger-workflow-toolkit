@@ -1,11 +1,11 @@
 // ==UserScript==
 // @name         Dispute Handling — Queue Auto-Claim
 // @namespace    https://github.com/cvidal22
-// @version      6.1.1
+// @version      6.1.2
 // @description  Opens the next appeal in the task pool, so the operator never sits on a list between cases.
 // @author       cvidal22
 // @match        https://cvidal22.github.io/peerledger-workflow-toolkit/*
-// @require      https://raw.githubusercontent.com/cvidal22/peerledger-workflow-toolkit/main/core/pl-core.js?v=6.1.1
+// @require      https://raw.githubusercontent.com/cvidal22/peerledger-workflow-toolkit/main/core/pl-core.js?v=6.1.2
 // @grant        none
 // @run-at       document-idle
 // ==/UserScript==
@@ -89,7 +89,7 @@
 if (typeof PL === "undefined" || !PL.ui || !PL.ui.button) return;
 
   if (!PL.guard("queue-auto-claim")) return;
-  PL.requireCore("6.1.1");
+  PL.requireCore("6.1.2");
   PL.register("queue-auto-claim", "3.0.0");
 
   var poller = null;

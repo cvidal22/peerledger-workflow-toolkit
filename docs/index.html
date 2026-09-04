@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Dispute Simulator</title>
 <meta name="description" content="A fictional peer-to-peer dispute handling console, used to demonstrate userscript automation of an operational workflow." />
-<link rel="stylesheet" href="styles.css?v=6.1.1" />
+<link rel="stylesheet" href="styles.css?v=6.1.2" />
 </head>
 <body>
 
@@ -41,9 +41,9 @@
   <main class="main" id="main">
 
     <section class="view" id="view-queue">
-      <div class="crumb"><span>Disputes</span> › <span id="queue-crumb">Work queue</span></div>
+      <div class="crumb"><span>Disputes</span> › <span id="queue-crumb">Task pool</span></div>
       <div class="viewhead">
-        <h1 id="queue-title">Work queue</h1>
+        <h1 id="queue-title">Task pool</h1>
         <div class="spacer"></div>
         <div class="filters">
           <select id="type-filter"><option value="">All types</option></select>
@@ -73,7 +73,7 @@
     </section>
 
     <section class="view" id="view-case" hidden>
-      <div class="crumb"><span>Disputes</span> › <a href="#/queue">Work queue</a> › <span id="case-crumb"></span></div>
+      <div class="crumb"><span>Disputes</span> › <a href="#/queue">Task pool</a> › <span id="case-crumb"></span></div>
       <div class="viewhead">
         <h1 id="case-heading"></h1>
         <span class="tag" id="case-status"></span>
@@ -207,8 +207,8 @@
 
 <div class="toasts" id="toasts" aria-live="polite"></div>
 
-<script src="data.js?v=6.1.1"></script>
-<script src="app.js?v=6.1.1"></script>
-<script src="preview.js?v=6.1.1"></script>
+<script src="data.js?v=6.1.2"></script>
+<script src="app.js?v=6.1.2"></script>
+<script src="preview.js?v=6.1.2"></script>
 </body>
 </html>
